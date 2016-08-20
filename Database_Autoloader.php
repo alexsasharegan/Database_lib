@@ -2,7 +2,7 @@
 
 function Database_Autoloader($classname) {
   //Can't use __DIR__ as it's only in PHP 5.3+
-  $filename = __DIR__.DIRECTORY_SEPARATOR.'lib'.DIRECTORY_SEPARATOR.$classname.'.class'.'.php';
+  $filename = dirname(__FILE__).DIRECTORY_SEPARATOR.'lib'.DIRECTORY_SEPARATOR.$classname.'.class'.'.php';
   if (is_readable($filename)) {
     require_once $filename;
   }

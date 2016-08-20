@@ -2,7 +2,7 @@
 
 /**
  * Database::connect()
- * Public Static method for connecting to a database
+ * Public Static method for connecting to a database and returning a handle
  *
  */
 class Database {
