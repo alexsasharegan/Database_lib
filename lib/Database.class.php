@@ -7,25 +7,27 @@
  */
 class Database {
 
+  public $db;
+
+  public static $DATABASE_CONFIG_OPTIONS = [
+    'hostName'     => 'yourHostName',
+    'databaseName' => 'yourDatabaseName',
+    'dbUserName'   => 'yourUsername',
+    'dbPassword'   => 'yourpassword',
+  ];
+
   public static function connect($options = []) {
 
-    $DATABASE_CONFIG_OPTIONS = [
-      'hostName'     => 'yourHostName',
-      'databaseName' => 'yourDatabaseName',
-      'dbUserName'   => 'yourUsername',
-      'dbPassword'   => 'yourpassword',
-    ];
-
     if (!empty($options)) {
-      $hostName     = !empty($options['hostName'])     ? $options['hostName']     : $DATABASE_CONFIG_OPTIONS['hostName'];
-      $databaseName = !empty($options['databaseName']) ? $options['databaseName'] : $DATABASE_CONFIG_OPTIONS['databaseName'];
-      $dbUserName   = !empty($options['dbUserName'])   ? $options['dbUserName']   : $DATABASE_CONFIG_OPTIONS['dbUserName'];
-      $dbPassword   = !empty($options['dbPassword'])   ? $options['dbPassword']   : $DATABASE_CONFIG_OPTIONS['dbPassword'];
+      $hostName     = !empty($options['hostName'])     ? $options['hostName']     : self::$DATABASE_CONFIG_OPTIONS['hostName'];
+      $databaseName = !empty($options['databaseName']) ? $options['databaseName'] : self::$DATABASE_CONFIG_OPTIONS['databaseName'];
+      $dbUserName   = !empty($options['dbUserName'])   ? $options['dbUserName']   : self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
+      $dbPassword   = !empty($options['dbPassword'])   ? $options['dbPassword']   : self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
     } else {
-      $hostName     = $DATABASE_CONFIG_OPTIONS['hostName'];
-      $databaseName = $DATABASE_CONFIG_OPTIONS['databaseName'];
-      $dbUserName   = $DATABASE_CONFIG_OPTIONS['dbUserName'];
-      $dbPassword   = $DATABASE_CONFIG_OPTIONS['dbPassword'];
+      $hostName     = self::$DATABASE_CONFIG_OPTIONS['hostName'];
+      $databaseName = self::$DATABASE_CONFIG_OPTIONS['databaseName'];
+      $dbUserName   = self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
+      $dbPassword   = self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
     }
 
     $mysqli = new mysqli( $hostName, $dbUserName, $dbPassword, $databaseName );
@@ -35,6 +37,14 @@ class Database {
     if (!$mysqli->set_charset('utf8')) { exit("Error loading character set utf8 for db $databaseName: %s\n".$mysqli->error); }
 
     return $mysqli;
+  }
+
+  function __construct($options = []) {
+    $this->db = self::connect($options);
+  }
+
+  function __destruct() {
+    $this->db->close();
   }
 
 }
