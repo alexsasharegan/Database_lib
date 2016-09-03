@@ -4,7 +4,14 @@ require_once __DIR__."/Exceptions/BadQuery.exception.class.php";
 
 class Database {
 
-  public $db, $_query, $queryResult;
+  public  $db,
+          $_query,
+          $queryResult,
+          $hostName,
+          $dbUserName,
+          $dbPassword,
+          $databaseName,
+          $columns = [];
 
   public static $DATABASE_CONFIG_OPTIONS = [
     'hostName'     => 'yourHostName',
@@ -37,7 +44,26 @@ class Database {
   }
 
   function __construct($options = []) {
-    $this->db = self::connect($options);
+
+    if (!empty($options)) {
+      $this->hostName     = !empty($options['hostName']) ? $options['hostName'] : self::$DATABASE_CONFIG_OPTIONS['hostName'];
+      $this->databaseName = !empty($options['databaseName']) ? $options['databaseName'] : self::$DATABASE_CONFIG_OPTIONS['databaseName'];
+      $this->dbUserName   = !empty($options['dbUserName']) ? $options['dbUserName'] : self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
+      $this->dbPassword   = !empty($options['dbPassword']) ? $options['dbPassword'] : self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
+    } else {
+      $this->hostName     = self::$DATABASE_CONFIG_OPTIONS['hostName'];
+      $this->databaseName = self::$DATABASE_CONFIG_OPTIONS['databaseName'];
+      $this->dbUserName   = self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
+      $this->dbPassword   = self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
+    }
+
+    $mysqli = new mysqli( $this->hostName, $this->dbUserName, $this->dbPassword, $this->databaseName );
+
+    # Check for errors
+    if (mysqli_connect_errno()) { exit(mysqli_connect_error()); }
+    if (!$mysqli->set_charset('utf8')) { exit("Error loading character set utf8 for db $databaseName: %s\n".$mysqli->error); }
+
+    $this->db = $mysqli;
   }
 
   function __destruct() {
@@ -58,7 +84,7 @@ class Database {
   public function getResults($cb) {
 
     $args = array_slice(func_get_args(), 1);
-    
+
     if ( is_callable( $cb ) ) {
       while ( $record = $this->queryResult->fetch_assoc() ) {
         $params = array_merge( [ $record ], $args );
@@ -66,6 +92,28 @@ class Database {
       }
     }
 
+  }
+
+  public function getColumns( $tableName, $databaseName ) {
+
+    if ( empty($databaseName) ) {
+      $databaseName = $this->databaseName;
+    }
+
+    $this->query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = '$tableName' AND table_schema = '$databaseName'"
+    );
+
+    $this->getResults(
+      function ( $row, $tableName ) {
+        foreach ( $row as $index => $columnName ) {
+          $this->columns[$tableName][] = $columnName;
+        }
+      }
+      , $tableName
+    );
+
+    return $this->columns[$tableName];
   }
 
 }
