@@ -1,13 +1,10 @@
 <?php
 
-/**
- * Database::connect()
- * Public Static method for connecting to a database and returning a handle
- *
- */
+require_once __DIR__."/Exceptions/BadQuery.exception.class.php";
+
 class Database {
 
-  public $db;
+  public $db, $_query, $queryResult;
 
   public static $DATABASE_CONFIG_OPTIONS = [
     'hostName'     => 'yourHostName',
@@ -19,10 +16,10 @@ class Database {
   public static function connect($options = []) {
 
     if (!empty($options)) {
-      $hostName     = !empty($options['hostName'])     ? $options['hostName']     : self::$DATABASE_CONFIG_OPTIONS['hostName'];
+      $hostName     = !empty($options['hostName']) ? $options['hostName'] : self::$DATABASE_CONFIG_OPTIONS['hostName'];
       $databaseName = !empty($options['databaseName']) ? $options['databaseName'] : self::$DATABASE_CONFIG_OPTIONS['databaseName'];
-      $dbUserName   = !empty($options['dbUserName'])   ? $options['dbUserName']   : self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
-      $dbPassword   = !empty($options['dbPassword'])   ? $options['dbPassword']   : self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
+      $dbUserName   = !empty($options['dbUserName']) ? $options['dbUserName'] : self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
+      $dbPassword   = !empty($options['dbPassword']) ? $options['dbPassword'] : self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
     } else {
       $hostName     = self::$DATABASE_CONFIG_OPTIONS['hostName'];
       $databaseName = self::$DATABASE_CONFIG_OPTIONS['databaseName'];
@@ -45,6 +42,30 @@ class Database {
 
   function __destruct() {
     $this->db->close();
+  }
+
+  public function query( $query ) {
+
+    $this->_query = $query;
+
+    if ( !$this->queryResult = $this->db->query( $this->_query ) ) {
+      throw new BadQuery( $this->_query, $this->db->error );
+    }
+
+    return $this->queryResult;
+  }
+
+  public function getResults($cb) {
+
+    $args = array_slice(func_get_args(), 1);
+    
+    if ( is_callable( $cb ) ) {
+      while ( $record = $this->queryResult->fetch_assoc() ) {
+        $params = array_merge( [ $record ], $args );
+        call_user_func_array( $cb, $params );
+      }
+    }
+
   }
 
 }
