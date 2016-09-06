@@ -4,9 +4,9 @@ require_once __DIR__."/Exceptions/BadQuery.exception.class.php";
 
 class Database {
 
-  public  $db,
-          $_query,
-          $queryResult,
+  public  $db = null,
+          $_query = '',
+          $queryResult = null,
           $hostName,
           $dbUserName,
           $dbPassword,
@@ -37,10 +37,29 @@ class Database {
     $mysqli = new mysqli( $hostName, $dbUserName, $dbPassword, $databaseName );
 
     # Check for errors
-    if (mysqli_connect_errno()) { exit(mysqli_connect_error()); }
-    if (!$mysqli->set_charset('utf8')) { exit("Error loading character set utf8 for db $databaseName: %s\n".$mysqli->error); }
+    if ( mysqli_connect_errno()) {
+      exit( mysqli_connect_error() );
+    }
+
+    if ( !$mysqli->set_charset( 'utf8' ) ) {
+      exit( "Error loading character set utf8 for db $databaseName: %s\n".$mysqli->error );
+    }
 
     return $mysqli;
+  }
+
+  public static function SQLDateToPath( $SQLDate ) {
+    $timeStamp = strtotime( $SQLDate );
+
+    return implode( DIRECTORY_SEPARATOR, [
+      date('Y', $timeStamp),
+      date('m', $timeStamp),
+      date('d', $timeStamp),
+    ]);
+  }
+
+  public static function getSQLDate() {
+    return date('Y-m-d H:i:s');
   }
 
   function __construct($options = []) {
@@ -71,19 +90,24 @@ class Database {
   }
 
   public function query( $query ) {
-
     $this->_query = $query;
 
     if ( !$this->queryResult = $this->db->query( $this->_query ) ) {
       throw new BadQuery( $this->_query, $this->db->error );
     }
 
-    return $this->queryResult;
+    return $this;
   }
 
-  public function getResults($cb) {
+  public function getLastQuery() {
+    if ( isset( $this->_query ) ) {
+      return $this->_query;
+    }
+    return null;
+  }
 
-    $args = array_slice(func_get_args(), 1);
+  public function iterateResult( $cb ) {
+    $args = array_slice( func_get_args(), 1 );
 
     if ( is_callable( $cb ) ) {
       while ( $record = $this->queryResult->fetch_assoc() ) {
@@ -92,11 +116,18 @@ class Database {
       }
     }
 
+    return $this;
   }
 
-  public function getColumns( $tableName, $databaseName ) {
+  public function getResult() {
+    if ( isset( $this->queryResult ) ) {
+      return $this->queryResult;
+    }
+    return null;
+  }
 
-    if ( empty($databaseName) ) {
+  public function getColumns( $tableName, $databaseName = '' ) {
+    if ( empty( $databaseName ) ) {
       $databaseName = $this->databaseName;
     }
 
@@ -104,7 +135,7 @@ class Database {
       "SELECT column_name FROM information_schema.columns WHERE table_name = '$tableName' AND table_schema = '$databaseName'"
     );
 
-    $this->getResults(
+    $this->iterateResult(
       function ( $row, $tableName ) {
         foreach ( $row as $index => $columnName ) {
           $this->columns[$tableName][] = $columnName;
@@ -114,6 +145,68 @@ class Database {
     );
 
     return $this->columns[$tableName];
+  }
+
+  public function buildInserts( array $insertList ) {
+    $escapedKeyValuePairs = $this->escapeKeyValuePairs( $insertList );
+
+    return [
+      'keys' => implode(',', $escapedKeyValuePairs['keys']),
+      'values' => implode(',', $escapedKeyValuePairs['values'])
+    ];
+  }
+
+  public function buildUpdate( array $insertList ) {
+    $updateList = [];
+    $escapedKeyValuePairs = $this->escapeKeyValuePairs( $insertList );
+    $length = count( $escapedKeyValuePairs['keys'] );
+
+    for ( $i=0 ; $i < $length ; $i++ ) {
+      $updateList[] = "{$escapedKeyValuePairs['keys'][$i]}={$escapedKeyValuePairs['values'][$i]}";
+    }
+
+    return implode( ', ', $updateList );
+  }
+
+  public function escapeKeyValuePairs( array $array ) {
+    $keys = [];
+    $values = [];
+
+    foreach ( $array as $key => $val ) {
+      switch ( gettype( $val ) ) {
+        case 'object': # handle objects
+        case 'array': # and arrays the same
+          $safeKey = $this->db->real_escape_string( trim( $key ) );
+          $keys[] = ("`$safeKey`");
+
+          $jsonStrValue = json_encode($val);
+          $safeValue = $this->db->real_escape_string( $jsonStrValue );
+          $values[] = "'$safeValue'";
+          break;
+        case 'string': # escape key & value and wrap in quotes
+          $safeKey = $this->db->real_escape_string( trim( $key ) );
+          $keys[] = ("`$safeKey`");
+
+          $safeValue = $this->db->real_escape_string($val);
+          $values[] = "'$safeValue'";
+          break;
+        case 'boolean': # booleans
+        case 'double': # doubles
+        case 'integer': # & integers don't need escaping or quotations
+          $safeKey = $this->db->real_escape_string( trim( $key ) );
+          $keys[] = ("`$safeKey`");
+
+          $values[] = $val;
+          break;
+        default: # if the value doesn't match these types,
+          break; # skip inclusion
+      }
+    }
+
+    return [
+      'keys' => $keys,
+      'values' => $values,
+    ];
   }
 
 }
