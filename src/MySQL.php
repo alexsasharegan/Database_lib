@@ -1,16 +1,13 @@
 <?php
 
-require_once __DIR__."/Exceptions/BadQuery.exception.class.php";
+namespace Database;
+use Database\Exceptions\BadQuery;
 
-class Database {
+class MySQL {
 
   public  $db = null,
           $_query = '',
           $queryResult = null,
-          $hostName,
-          $dbUserName,
-          $dbPassword,
-          $databaseName,
           $columns = [];
 
   public static $DATABASE_CONFIG_OPTIONS = [
@@ -34,7 +31,7 @@ class Database {
       $dbPassword   = self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
     }
 
-    $mysqli = new mysqli( $hostName, $dbUserName, $dbPassword, $databaseName );
+    $mysqli = new \mysqli( $hostName, $dbUserName, $dbPassword, $databaseName );
 
     # Check for errors
     if ( mysqli_connect_errno()) {
@@ -48,7 +45,8 @@ class Database {
     return $mysqli;
   }
 
-  public static function SQLDateToPath( $SQLDate ) {
+  public static function SQLDateToPath( $SQLDate, $timezone = "America/Phoenix" ) {
+    date_default_timezone_set( $timezone );
     $timeStamp = strtotime( $SQLDate );
 
     return implode( DIRECTORY_SEPARATOR, [
@@ -58,7 +56,8 @@ class Database {
     ]);
   }
 
-  public static function getSQLDate() {
+  public static function getSQLDate( $timezone = "America/Phoenix" ) {
+    date_default_timezone_set( $timezone );
     return date('Y-m-d H:i:s');
   }
 
@@ -76,7 +75,7 @@ class Database {
       $this->dbPassword   = self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
     }
 
-    $mysqli = new mysqli( $this->hostName, $this->dbUserName, $this->dbPassword, $this->databaseName );
+    $mysqli = new \mysqli( $this->hostName, $this->dbUserName, $this->dbPassword, $this->databaseName );
 
     # Check for errors
     if (mysqli_connect_errno()) { exit(mysqli_connect_error()); }
@@ -136,12 +135,11 @@ class Database {
     );
 
     $this->iterateResult(
-      function ( $row, $tableName ) {
+      function ( $row ) use ( $tableName ) {
         foreach ( $row as $index => $columnName ) {
           $this->columns[$tableName][] = $columnName;
         }
       }
-      , $tableName
     );
 
     return $this->columns[$tableName];
@@ -168,11 +166,11 @@ class Database {
     return implode( ', ', $updateList );
   }
 
-  public function escapeKeyValuePairs( array $array ) {
+  public function escapeKeyValuePairs( array $assoc_array ) {
     $keys = [];
     $values = [];
 
-    foreach ( $array as $key => $val ) {
+    foreach ( $assoc_array as $key => $val ) {
       switch ( gettype( $val ) ) {
         case 'object': # handle objects
         case 'array': # and arrays the same
@@ -187,14 +185,14 @@ class Database {
           $safeKey = $this->db->real_escape_string( trim( $key ) );
           $keys[] = ("`$safeKey`");
 
-          $safeValue = $this->db->real_escape_string($val);
+          $safeValue = $this->db->real_escape_string( $val );
           $values[] = "'$safeValue'";
           break;
         case 'boolean': # booleans
         case 'double': # doubles
         case 'integer': # & integers don't need escaping or quotations
           $safeKey = $this->db->real_escape_string( trim( $key ) );
-          $keys[] = ("`$safeKey`");
+          $keys[] = "`$safeKey`";
 
           $values[] = $val;
           break;

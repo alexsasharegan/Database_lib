@@ -1,6 +1,8 @@
 <?php
 
-class BadQuery extends Exception implements JsonSerializable {
+namespace Database\Exceptions;
+
+class BadQuery extends \Exception implements \JsonSerializable {
 
   public function __construct( $query, $mysqliErrorMsg, $code = 0, Exception $previous = null ) {
     $this->query = $query;
