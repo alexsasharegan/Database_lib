@@ -1,5 +1,5 @@
 {
-    "name": "alexsasharegan/Database",
+    "name": "alexsasharegan/database",
     "type": "library",
     "description": "PHP mysqli utilities to properly handle errors, connections, and make getting data simpler and more DRY.",
     "keywords": ["database", "rdbms", "mysql", "mysqli", "sql"],
