@@ -1,7 +1,10 @@
 <?php
 
 function Database_Autoloader($classname) {
-  $filename = __DIR__.DIRECTORY_SEPARATOR.'lib'.DIRECTORY_SEPARATOR.$classname.'.class'.'.php';
+  $pathParts = explode("\\", $classname);
+  array_unshift($pathParts, 'src');
+  $path = implode(DIRECTORY_SEPARATOR, $pathParts);
+  $filename = __DIR__.DIRECTORY_SEPARATOR.$path.'.class.php';
   if (is_readable($filename)) {
     require_once $filename;
   }
