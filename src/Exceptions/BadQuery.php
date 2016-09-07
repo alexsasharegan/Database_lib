@@ -11,7 +11,7 @@ class BadQuery extends \Exception implements \JsonSerializable {
   }
 
   public function __toString() {
-    return __CLASS__ . ": [Query: {$this->query}]: {$this->message}\n";
+    return __CLASS__ . ". [query: \"{$this->query}\"] {$this->message}\n";
   }
 
   public function jsonSerialize() {

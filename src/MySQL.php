@@ -5,33 +5,35 @@ use Database\Exceptions\BadQuery;
 
 class MySQL {
 
+  const CONFIG = './database.json';
+
   public  $db = null,
           $_query = '',
           $queryResult = null,
           $columns = [];
 
-  public static $DATABASE_CONFIG_OPTIONS = [
-    'hostName'     => 'yourHostName',
-    'databaseName' => 'yourDatabaseName',
-    'dbUserName'   => 'yourUsername',
-    'dbPassword'   => 'yourpassword',
-  ];
+  public static function connect( $configFile = './database.json', array $options = [] ) {
 
-  public static function connect($options = []) {
-
-    if (!empty($options)) {
-      $hostName     = !empty($options['hostName']) ? $options['hostName'] : self::$DATABASE_CONFIG_OPTIONS['hostName'];
-      $databaseName = !empty($options['databaseName']) ? $options['databaseName'] : self::$DATABASE_CONFIG_OPTIONS['databaseName'];
-      $dbUserName   = !empty($options['dbUserName']) ? $options['dbUserName'] : self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
-      $dbPassword   = !empty($options['dbPassword']) ? $options['dbPassword'] : self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
-    } else {
-      $hostName     = self::$DATABASE_CONFIG_OPTIONS['hostName'];
-      $databaseName = self::$DATABASE_CONFIG_OPTIONS['databaseName'];
-      $dbUserName   = self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
-      $dbPassword   = self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
+    if ( empty( $configFile ) ) {
+      $host     = $options['host'];
+      $database = $options['database'];
+      $username = $options['username'];
+      $password = $options['password'];
+    } elseif ( !empty( $configFile ) && empty( $options ) ) {
+      $config = json_decode( file_get_contents( $configFile ) );
+      $host     = $config->host;
+      $database = $config->database;
+      $username = $config->username;
+      $password = $config->password;
+    } elseif ( !empty( $configFile ) && !empty( $options ) ) {
+      $config   = json_decode( file_get_contents( $configFile ) );
+      $host     = !empty($options['host'])     ? $options['host']     : $config->host;
+      $database = !empty($options['database']) ? $options['database'] : $config->database;
+      $username = !empty($options['username']) ? $options['username'] : $config->username;
+      $password = !empty($options['password']) ? $options['password'] : $config->password;
     }
 
-    $mysqli = new \mysqli( $hostName, $dbUserName, $dbPassword, $databaseName );
+    $mysqli = new \mysqli( $host, $username, $password, $database );
 
     # Check for errors
     if ( mysqli_connect_errno()) {
@@ -39,7 +41,7 @@ class MySQL {
     }
 
     if ( !$mysqli->set_charset( 'utf8' ) ) {
-      exit( "Error loading character set utf8 for db $databaseName: %s\n".$mysqli->error );
+      exit( "Error loading character set utf8 for db $database: %s\n".$mysqli->error );
     }
 
     return $mysqli;
@@ -61,25 +63,36 @@ class MySQL {
     return date('Y-m-d H:i:s');
   }
 
-  function __construct($options = []) {
+  function __construct( $configFile = './database.json', array $options = [] ) {
 
-    if (!empty($options)) {
-      $this->hostName     = !empty($options['hostName']) ? $options['hostName'] : self::$DATABASE_CONFIG_OPTIONS['hostName'];
-      $this->databaseName = !empty($options['databaseName']) ? $options['databaseName'] : self::$DATABASE_CONFIG_OPTIONS['databaseName'];
-      $this->dbUserName   = !empty($options['dbUserName']) ? $options['dbUserName'] : self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
-      $this->dbPassword   = !empty($options['dbPassword']) ? $options['dbPassword'] : self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
-    } else {
-      $this->hostName     = self::$DATABASE_CONFIG_OPTIONS['hostName'];
-      $this->databaseName = self::$DATABASE_CONFIG_OPTIONS['databaseName'];
-      $this->dbUserName   = self::$DATABASE_CONFIG_OPTIONS['dbUserName'];
-      $this->dbPassword   = self::$DATABASE_CONFIG_OPTIONS['dbPassword'];
+    if ( empty( $configFile ) ) {
+      $this->host     = $options['host'];
+      $this->database = $options['database'];
+      $this->username = $options['username'];
+      $this->password = $options['password'];
+    } elseif ( !empty( $configFile ) && empty( $options ) ) {
+      $config = json_decode( file_get_contents( $configFile ) );
+      $this->host     = $config->host;
+      $this->database = $config->database;
+      $this->username = $config->username;
+      $this->password = $config->password;
+    } elseif ( !empty( $configFile ) && !empty( $options ) ) {
+      $config = json_decode( file_get_contents( $configFile ) );
+      $this->host     = !empty($options['host'])     ? $options['host']     : $config->host;
+      $this->database = !empty($options['database']) ? $options['database'] : $config->database;
+      $this->username = !empty($options['username']) ? $options['username'] : $config->username;
+      $this->password = !empty($options['password']) ? $options['password'] : $config->password;
     }
 
-    $mysqli = new \mysqli( $this->hostName, $this->dbUserName, $this->dbPassword, $this->databaseName );
+    $mysqli = new \mysqli( $this->host, $this->username, $this->password, $this->database );
 
     # Check for errors
-    if (mysqli_connect_errno()) { exit(mysqli_connect_error()); }
-    if (!$mysqli->set_charset('utf8')) { exit("Error loading character set utf8 for db $databaseName: %s\n".$mysqli->error); }
+    if ( mysqli_connect_errno() ) {
+      exit( mysqli_connect_error() );
+    }
+    if ( !$mysqli->set_charset( 'utf8' ) ) {
+      exit( "Error loading character set utf8 for db {$this->database}: %s\n" . $mysqli->error );
+    }
 
     $this->db = $mysqli;
   }
@@ -125,24 +138,62 @@ class MySQL {
     return null;
   }
 
-  public function getColumns( $tableName, $databaseName = '' ) {
-    if ( empty( $databaseName ) ) {
-      $databaseName = $this->databaseName;
+  public function insert( $table, array $insertPairs, $update = false ) {
+    if ( empty( $insertPairs ) ) {
+      return false;
+    }
+
+    $escapedInserts = $this->buildInserts( $insertPairs );
+
+    if ( $update ) {
+      $updateStr = $this->buildUpdate( $insertPairs );
+      $this->query("INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE $updateStr;");
+    } else {
+      $this->query("INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']});");
+    }
+
+    if ($this->getResult() === true) {
+      return $this->db->insert_id;
+    } else {
+      return false;
+    }
+  }
+
+  public function insertOnUpdate( $table, array $insertPairs, array $updatePairs ) {
+    if ( empty( $insertPairs ) || empty( $updatePairs ) ) {
+      return false;
+    }
+
+    $escapedInserts = $this->buildInserts( $insertPairs );
+    $updateStr = $this->buildUpdate( $updatePairs );
+
+    $this->query("INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE $updateStr;");
+
+    if ($this->getResult() === true) {
+      return $this->db->insert_id;
+    } else {
+      return false;
+    }
+  }
+
+  public function getColumns( $table, $database = '' ) {
+    if ( empty( $database ) ) {
+      $database = $this->database;
     }
 
     $this->query(
-      "SELECT column_name FROM information_schema.columns WHERE table_name = '$tableName' AND table_schema = '$databaseName'"
+      "SELECT column_name FROM information_schema.columns WHERE table_name = '$table' AND table_schema = '$database'"
     );
 
     $this->iterateResult(
-      function ( $row ) use ( $tableName ) {
+      function ( $row ) use ( $table ) {
         foreach ( $row as $index => $columnName ) {
-          $this->columns[$tableName][] = $columnName;
+          $this->columns[$table][] = $columnName;
         }
       }
     );
 
-    return $this->columns[$tableName];
+    return $this->columns[$table];
   }
 
   public function buildInserts( array $insertList ) {

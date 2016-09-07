@@ -40,34 +40,20 @@ require_once 'path/to/Database_lib/Database_Autoloader.php';
 
 ### Static Methods
 
-Calling `Database::connect( [ array $options ] )` without any arguments will use the class defaults to return a database handle. To set up your config defaults, open up the source file `path/to/Database_lib/src/MySQL.php`. It will look something like this:
+Calling `Database::connect( [ string $configFile = './database.json', array $options = [] ] )` without any arguments will look for a configuration file called `database.json` file in the calling file's directory. To make use of this default behavior, place your `database.json` next to your php file. If your config file exists elsewhere, pass in the path as the first argument.
 
-```php
-<?php
+An example config file is included in the project. Just change the name from `database.example.json` to `database.json` and move it next to your calling php file. Here is the example config:
 
-namespace Database;
-use Database\Exceptions\BadQuery;
-
-class MySQL {
-
-  public  $db = null,
-          $_query = '',
-          $queryResult = null,
-          $columns = [];
-
-  # change these to your own configuration
-  public static $DATABASE_CONFIG_OPTIONS = [
-    'hostName'     => 'yourHostName',
-    'databaseName' => 'yourDatabaseName',
-    'dbUserName'   => 'yourUsername',
-    'dbPassword'   => 'yourpassword',
-  ];
-
-  ...
+```json
+{
+  "host"     : "yourHostName",
+  "database" : "yourDatabaseName",
+  "username" : "yourUsername",
+  "password" : "yourPassword"
 }
 ```
 
-If you wish to connect using different connection settings on the fly, you can pass an associative array with whichever connection setting you wish to override. The config array contains the associative array keys you need to use:
+If you wish to connect using different connection settings on the fly, as the second argument you can pass an associative array with whichever connection setting you wish to override. The config array contains the same keys as `database.json`:
 
 ```php
 <?php
@@ -80,14 +66,24 @@ use Database\MySQL;
 # with any number of these four params
 # that you wish to override
 
-$DATABASE_CONFIG_OPTIONS = [
-  'hostName'     => 'yourHostName',
-  'databaseName' => 'yourDatabaseName',
-  'dbUserName'   => 'yourUsername',
-  'dbPassword'   => 'yourpassword',
+$CONFIG_OPTIONS = [
+  'host'     => 'yourHostName',
+  'database' => 'yourDatabaseName',
+  'username' => 'yourUsername',
+  'password' => 'yourpassword',
 ];
 
-$mysqliHandle = MySQL::connect($DATABASE_CONFIG_OPTIONS);
+$mysqliHandle = MySQL::connect('path/to/database.json', $CONFIG_OPTIONS);
+
+# if you're overriding all config options, you don't need the config file
+# just pass null as the first argument
+$mysqliHandle = MySQL::connect(null, $CONFIG_OPTIONS);
+
+# if you want to save configurations for different databases,
+# just use the json config format from database.json
+# and name it however you like. Here is a suggested convention:
+$mysqliHandleToUsers     = MySQL::connect('users.database.json');
+$mysqliHandleToEmployees = MySQL::connect('employees.database.json');
 ```
 
 Some other static methods:
@@ -112,6 +108,8 @@ echo MySQL::getSQLDate();
 
 ### Instance Methods
 
+#### SELECT
+
 ```php
 <?php
 
@@ -120,12 +118,12 @@ use Database\MySQL;
 
 # create an instance with these credentials
 # opens a MySQL connection and saves the handle internally
-$db = new MySQL([
-    'hostName'     => '1.1.1.1',
-    'databaseName' => 'myDatabase',
-    'dbUserName'   => 'admin',
-    'dbPassword'   => 'adminPass',
-  ]);
+$db = new MySQL(null, [
+  'host'     => '1.1.1.1',
+  'database' => 'myDatabase',
+  'username' => 'admin',
+  'password' => 'adminPass',
+]);
 
 # create an empty user to save our query result
 $users = [];
@@ -146,4 +144,71 @@ try {
   # insert some custom error handling here
   exit( $e );
 }
+```
+
+#### INSERT
+
+```php
+<?php
+require_once 'path/to/vendor/autoload.php';
+use Database\MySQL;
+
+$db = new MySQL('./path/to/database.json');
+
+# some data for our new user
+$newUser = [
+  'firstName' => 'John',
+  'lastName'  => 'Doe',
+  'status'    => 'NEW',
+  'created'   => $db->getSQLDate(),
+];
+
+# returns the insert id on success, FALSE on failure
+$userId = $db->insert('users', $newUser);
+
+# alternately, we can turn on ON DUPLICATE UPDATE
+# with all the same insert values by passing TRUE
+$userId = $db->insert('users', $newUser, TRUE);
+
+# if you need to define a custom set of update key/value pairs,
+# use Database\MySQL::insertOnDuplicate
+$userId = $db->insertOnDuplicate('users', $newUser, ['status' => 'MODIFIED']);
+# this will only update the status to 'MODIFIED' on duplicate
+```
+
+#### Other Methods
+
+```php
+<?php
+require_once 'path/to/vendor/autoload.php';
+use Database\MySQL;
+
+$db = new MySQL;
+
+$db->query("SELECT * FROM `users`");
+# chainable method returns object instance
+
+$db->iterateResult(function ($row) {
+  # do stuff to row ...
+});
+# chainable method returns object instance
+
+
+$db->getLastQuery();
+# returns "SELECT * FROM `users`"
+
+$db->getResult();
+# returns the mysqli result object from the last query or NULL
+
+# the connection handle is stored here:
+Database\MySQL::db
+# you can use all the mysqli methods from this prop
+
+# examples getting the error from mysqli:
+$db = new MySQL;
+$db->db->error;
+
+# with a different naming convention:
+$mysql = new MySQL;
+$mysql->db->error;
 ```
