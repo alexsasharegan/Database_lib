@@ -138,6 +138,25 @@ class MySQL {
     return null;
   }
 
+  public function getError() {
+    return $this->db->error;
+  }
+
+  public function affectedRows() {
+    if ( isset( $this->queryResult ) ) {
+      return $this->queryResult->num_rows;
+    }
+    return null;
+  }
+
+  public function insertId() {
+    $id = $this->db->insert_id;
+    if ( $id !== 0 ) {
+      return $id;
+    }
+    return null;
+  }
+
   public function insert( $table, array $insertPairs, $update = false ) {
     if ( empty( $insertPairs ) ) {
       return false;
@@ -215,6 +234,10 @@ class MySQL {
     }
 
     return implode( ', ', $updateList );
+  }
+
+  public function escape( $string ) {
+    return $this->db->real_escape_string( $string );
   }
 
   public function escapeKeyValuePairs( array $assoc_array ) {
