@@ -200,6 +200,18 @@ $db->getLastQuery();
 $db->getResult();
 # returns the mysqli result object from the last query or NULL
 
+$db->getError();
+# returns the last error message for the most recent MySQLi function call that can succeed or fail
+
+$db->affectRows();
+# returns the number of affected rows from the last query
+
+$db->insertId();
+# returns the insert id from the last query or NULL
+
+$db->escape( string $stringToEscape );
+# returns the escaped string
+
 # the connection handle is stored here:
 Database\MySQL::db
 # you can use all the mysqli methods from this prop
