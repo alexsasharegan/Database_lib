@@ -10,18 +10,48 @@ use Database\Exceptions\BadQuery;
  */
 class MySQL {
 	
+	/**
+	 *
+	 */
 	const CONFIG = './database.json';
 	
+	/**
+	 * @var \mysqli|null
+	 */
 	public $db = null;
+	/**
+	 * @var \mysqli_result|null
+	 */
 	public $queryResult = null;
+	/**
+	 * @var array
+	 */
 	public $columns = [];
 	
+	/**
+	 * @var string
+	 */
 	private $_host;
+	/**
+	 * @var string
+	 */
 	private $_database;
+	/**
+	 * @var string
+	 */
 	private $_username;
+	/**
+	 * @var string
+	 */
 	private $_password;
 	
+	/**
+	 * @var string
+	 */
 	private $_query = '';
+	/**
+	 * @var array
+	 */
 	private $_logs = [];
 	
 	/**
