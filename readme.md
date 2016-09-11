@@ -67,10 +67,10 @@ use Database\MySQL;
 # that you wish to override
 
 $CONFIG_OPTIONS = [
-  'host'     => 'yourHostName',
+  '_host'     => 'yourHostName',
   'database' => 'yourDatabaseName',
-  'username' => 'yourUsername',
-  'password' => 'yourpassword',
+  '_username' => 'yourUsername',
+  '_password' => 'yourpassword',
 ];
 
 $mysqliHandle = MySQL::connect('path/to/database.json', $CONFIG_OPTIONS);
@@ -120,9 +120,9 @@ use Database\MySQL;
 # opens a MySQL connection and saves the handle internally
 $db = new MySQL(null, [
   'host'     => '1.1.1.1',
-  'database' => 'myDatabase',
-  'username' => 'admin',
-  'password' => 'adminPass',
+  '_database' => 'myDatabase',
+  '_username' => 'admin',
+  '_password' => 'adminPass',
 ]);
 
 # create an empty user to save our query result

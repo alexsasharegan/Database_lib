@@ -12,10 +12,17 @@ class MySQL {
 	
 	const CONFIG = './database.json';
 	
-	public $db = null,
-		$_query = '',
-		$queryResult = null,
-		$columns = [];
+	public $db = null;
+	public $queryResult = null;
+	public $columns = [];
+	
+	private $_host;
+	private $_database;
+	private $_username;
+	private $_password;
+	
+	private $_query = '';
+	private $_logs = [];
 	
 	/**
 	 * @param string $configFile
@@ -27,7 +34,7 @@ class MySQL {
 		if ( empty($configFile) ) {
 			$host     = $options['host'];
 			$database = $options['database'];
-			$username = $options['username'];
+			$username = $options['_username'];
 			$password = $options['password'];
 		} elseif ( !empty($configFile) && empty($options) ) {
 			$config   = json_decode( file_get_contents( $configFile ) );
@@ -39,7 +46,7 @@ class MySQL {
 			$config   = json_decode( file_get_contents( $configFile ) );
 			$host     = !empty($options['host']) ? $options['host'] : $config->host;
 			$database = !empty($options['database']) ? $options['database'] : $config->database;
-			$username = !empty($options['username']) ? $options['username'] : $config->username;
+			$username = !empty($options['_username']) ? $options['_username'] : $config->username;
 			$password = !empty($options['password']) ? $options['password'] : $config->password;
 		}
 		
@@ -90,39 +97,39 @@ class MySQL {
 	function __construct( $configFile = './database.json', array $options = [] ) {
 		
 		if ( empty($configFile) ) {
-			$this->host     = $options['host'];
-			$this->database = $options['database'];
-			$this->username = $options['username'];
-			$this->password = $options['password'];
+			$this->_host     = $options['host'];
+			$this->_database = $options['database'];
+			$this->_username = $options['_username'];
+			$this->_password = $options['password'];
 		} elseif ( !empty($configFile) && empty($options) ) {
-			$config         = json_decode( file_get_contents( $configFile ) );
-			$this->host     = $config->host;
-			$this->database = $config->database;
-			$this->username = $config->username;
-			$this->password = $config->password;
+			$config          = json_decode( file_get_contents( $configFile ) );
+			$this->_host     = $config->host;
+			$this->_database = $config->database;
+			$this->_username = $config->username;
+			$this->_password = $config->password;
 		} elseif ( !empty($configFile) && !empty($options) ) {
-			$config         = json_decode( file_get_contents( $configFile ) );
-			$this->host     = !empty($options['host']) ? $options['host'] : $config->host;
-			$this->database = !empty($options['database']) ? $options['database'] : $config->database;
-			$this->username = !empty($options['username']) ? $options['username'] : $config->username;
-			$this->password = !empty($options['password']) ? $options['password'] : $config->password;
+			$config          = json_decode( file_get_contents( $configFile ) );
+			$this->_host     = !empty($options['host']) ? $options['host'] : $config->host;
+			$this->_database = !empty($options['database']) ? $options['database'] : $config->database;
+			$this->_username = !empty($options['_username']) ? $options['_username'] : $config->username;
+			$this->_password = !empty($options['password']) ? $options['password'] : $config->password;
 		}
 		
-		$mysqli = new \mysqli( $this->host, $this->username, $this->password, $this->database );
+		$mysqli = new \mysqli( $this->_host, $this->_username, $this->_password, $this->_database );
 		
 		# Check for errors
 		if ( mysqli_connect_errno() ) {
 			exit(mysqli_connect_error());
 		}
 		if ( !$mysqli->set_charset( 'utf8' ) ) {
-			exit("Error loading character set utf8 for db {$this->database}: %s\n" . $mysqli->error);
+			exit("Error loading character set utf8 for db {$this->_database}: %s\n" . $mysqli->error);
 		}
 		
 		$this->db = $mysqli;
 	}
 	
 	/**
-	 *
+	 * closes the connection to mysql
 	 */
 	function __destruct() {
 		$this->db->close();
@@ -134,13 +141,21 @@ class MySQL {
 	 * @throws BadQuery
 	 */
 	public function query( $query ) {
-		$this->_query = $query;
+		$this->setQuery( $query );
 		
 		if ( !$this->queryResult = $this->db->query( $this->_query ) ) {
 			throw new BadQuery( $this->_query, $this->db->error );
 		}
 		
 		return $this;
+	}
+	
+	/**
+	 * @param string $query
+	 */
+	public function setQuery( $query ) {
+		$this->_query  = $query;
+		$this->_logs[] = $query;
 	}
 	
 	/**
@@ -265,7 +280,7 @@ class MySQL {
 	 */
 	public function getColumns( $table, $database = '' ) {
 		if ( empty($database) ) {
-			$database = $this->database;
+			$database = $this->_database;
 		}
 		
 		$this->query(
