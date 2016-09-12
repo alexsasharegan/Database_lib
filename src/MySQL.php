@@ -124,6 +124,65 @@ class MySQL {
 	}
 	
 	/**
+	 * @var string
+	 */
+	public static $lc_alpha = 'abcdefghijklmnopqrstuvwxyz';
+	
+	/**
+	 * @var string
+	 */
+	public static $uc_alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	
+	/**
+	 * @var string
+	 */
+	public static $numeric = '0123456789';
+	
+	/**
+	 * @param $length
+	 * @param bool $caseSensitive
+	 * @return string
+	 */
+	public static function randomString( $length, $caseSensitive = false ) {
+		if ( $caseSensitive ) {
+			$characters = self::$lc_alpha . self::$uc_alpha;
+		} else {
+			$characters = self::$lc_alpha;
+		}
+		$charLastIndex = (strlen( $characters ) - 1);
+		$string        = '';
+		$i             = 0;
+		
+		for ( $i; $i < $length; $i++ ) {
+			$string .= $characters[mt_rand( 0, $charLastIndex )];
+		}
+		
+		return $string;
+	}
+	
+	/**
+	 * @param $length
+	 * @param bool $caseSensitive
+	 * @return string
+	 */
+	public static function randomAlphaNumeric( $length, $caseSensitive = false ) {
+		if ( $caseSensitive ) {
+			$characters = self::$numeric . self::$lc_alpha . self::$uc_alpha;
+		} else {
+			$characters = self::$numeric . self::$lc_alpha;
+		}
+		$charLastIndex = (strlen( $characters ) - 1);
+		$string        = '';
+		$i             = 0;
+		
+		for ( $i; $i < $length; $i++ ) {
+			$string .= $characters[mt_rand( 0, $charLastIndex )];
+		}
+		
+		return $string;
+	}
+	
+	/**
 	 * MySQL constructor.
 	 * @param string $configFile
 	 * @param array $options
