@@ -20,6 +20,10 @@ class MySQL {
 	 */
 	public $db = null;
 	/**
+	 * @var
+	 */
+	public $_where;
+	/**
 	 * @var \mysqli_result|null
 	 */
 	public $queryResult = null;
@@ -181,6 +185,108 @@ class MySQL {
 	}
 	
 	/**
+	 * @param $table
+	 * @param array $columns
+	 * @param string $where
+	 * @return $this
+	 */
+	public function select( $table, $columns = [ '*' ], $where = '' ) {
+		$columns = implode( ', ', $this->escapeColumnNames( $columns ) );
+		if ( is_array( $where ) ) {
+			$WHERE = $this->getWhereClause( $where );
+		} else {
+			$WHERE = $where;
+		}
+		$this->query( "SELECT $columns FROM `$table` $WHERE" );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param string $table
+	 * @param array $insertPairs
+	 * @param bool $update
+	 * @return bool|integer
+	 */
+	public function insert( $table, array $insertPairs, $update = false ) {
+		if ( empty($insertPairs) ) {
+			return false;
+		}
+		
+		$escapedInserts = $this->buildInserts( $insertPairs );
+		
+		if ( $update ) {
+			$updateStr = $this->buildUpdate( $insertPairs );
+			$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE $updateStr;" );
+		} else {
+			$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']});" );
+		}
+		
+		if ( $this->getResult() === true ) {
+			return $this->db->insert_id;
+		} else {
+			return false;
+		}
+	}
+	
+	/**
+	 * @param string $table
+	 * @param array $insertPairs
+	 * @param array $updatePairs
+	 * @return bool|integer
+	 */
+	public function insertOnUpdate( $table, array $insertPairs, array $updatePairs ) {
+		if ( empty($insertPairs) || empty($updatePairs) ) {
+			return false;
+		}
+		
+		$escapedInserts = $this->buildInserts( $insertPairs );
+		$updateStr      = $this->buildUpdate( $updatePairs );
+		
+		$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE $updateStr;" );
+		
+		if ( $this->getResult() === true ) {
+			return $this->db->insert_id;
+		} else {
+			return false;
+		}
+	}
+	
+	/**
+	 * @param $table
+	 * @param $data
+	 * @param string $where
+	 * @return $this
+	 */
+	public function update( $table, $data, $where = '' ) {
+		$escapedData = $this->buildUpdate( $data );
+		if ( is_array( $where ) ) {
+			$WHERE = $this->getWhereClause( $where );
+		} else {
+			$WHERE = $where;
+		}
+		$this->query( "UPDATE `$table` SET {$escapedData} $WHERE" );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param $table
+	 * @param string $where
+	 * @return int|null
+	 */
+	public function delete( $table, $where = '' ) {
+		if ( is_array( $where ) ) {
+			$WHERE = $this->getWhereClause( $where );
+		} else {
+			$WHERE = $where;
+		}
+		$this->query( "DELETE FROM `$table` $WHERE`" );
+		
+		return $this->affectedRows();
+	}
+	
+	/**
 	 * @param string $query
 	 */
 	public function setQuery( $query ) {
@@ -254,53 +360,23 @@ class MySQL {
 	}
 	
 	/**
-	 * @param string $table
-	 * @param array $insertPairs
-	 * @param bool $update
-	 * @return bool|integer
+	 * @return array
 	 */
-	public function insert( $table, array $insertPairs, $update = false ) {
-		if ( empty($insertPairs) ) {
-			return false;
-		}
-		
-		$escapedInserts = $this->buildInserts( $insertPairs );
-		
-		if ( $update ) {
-			$updateStr = $this->buildUpdate( $insertPairs );
-			$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE $updateStr;" );
-		} else {
-			$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']});" );
-		}
-		
-		if ( $this->getResult() === true ) {
-			return $this->db->insert_id;
-		} else {
-			return false;
-		}
+	public function getLogs() {
+		return $this->_logs;
 	}
 	
 	/**
-	 * @param string $table
-	 * @param array $insertPairs
-	 * @param array $updatePairs
-	 * @return bool|integer
+	 * @param $whereData
+	 * @return Where
 	 */
-	public function insertOnUpdate( $table, array $insertPairs, array $updatePairs ) {
-		if ( empty($insertPairs) || empty($updatePairs) ) {
-			return false;
+	public function getWhereClause( $whereData ) {
+		if ( !isset($this->_where) ) {
+			$this->_where = new Where( $this->db );
 		}
+		$this->_where->parseClause( $whereData );
 		
-		$escapedInserts = $this->buildInserts( $insertPairs );
-		$updateStr      = $this->buildUpdate( $updatePairs );
-		
-		$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE $updateStr;" );
-		
-		if ( $this->getResult() === true ) {
-			return $this->db->insert_id;
-		} else {
-			return false;
-		}
+		return $this->_where;
 	}
 	
 	/**
@@ -342,12 +418,12 @@ class MySQL {
 	}
 	
 	/**
-	 * @param array $insertList
+	 * @param array $data
 	 * @return string
 	 */
-	public function buildUpdate( array $insertList ) {
+	public function buildUpdate( array $data ) {
 		$updateList           = [];
-		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $insertList );
+		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $data );
 		$length               = count( $escapedKeyValuePairs['keys'] );
 		
 		for ( $i = 0; $i < $length; $i++ ) {
@@ -363,6 +439,29 @@ class MySQL {
 	 */
 	public function escape( $string ) {
 		return $this->db->real_escape_string( $string );
+	}
+	
+	/**
+	 * @param $columnName
+	 * @return string
+	 */
+	public function escapeColumnName( $columnName ) {
+		if ( $columnName === '*' ) {
+			return $columnName;
+		}
+		return '`' . $this->escape( $columnName ) . '`';
+	}
+	
+	/**
+	 * @param array $colList
+	 * @return array
+	 */
+	public function escapeColumnNames( array $colList ) {
+		$escapedList = [];
+		foreach ( $colList as $col ) {
+			$escapedList[] = $this->escapeColumnName( $col );
+		}
+		return $escapedList;
 	}
 	
 	/**
@@ -408,6 +507,14 @@ class MySQL {
 			'keys' => $keys,
 			'values' => $values,
 		];
+	}
+	
+	/**
+	 * @param array $array
+	 * @return bool
+	 */
+	public function isAssoc( array $array ) {
+		return array_keys( $array ) !== range( 0, count( $array ) - 1 );
 	}
 	
 }
