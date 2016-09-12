@@ -81,7 +81,7 @@ class Clause {
 	 * @return bool
 	 */
 	public static function isValidType( $type ) {
-		return in_array( $type, self::$_typeList );
+		return in_array( strtoupper( trim( $type ) ), self::$_typeList );
 	}
 	
 	/**

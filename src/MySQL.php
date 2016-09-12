@@ -267,7 +267,7 @@ class MySQL {
 		}
 		$this->query( "UPDATE `$table` SET {$escapedData} $WHERE" );
 		
-		return $this;
+		return $this->affectedRows();
 	}
 	
 	/**
@@ -281,7 +281,7 @@ class MySQL {
 		} else {
 			$WHERE = $where;
 		}
-		$this->query( "DELETE FROM `$table` $WHERE`" );
+		$this->query( "DELETE FROM `$table` $WHERE" );
 		
 		return $this->affectedRows();
 	}
@@ -341,11 +341,18 @@ class MySQL {
 	/**
 	 * @return null|integer
 	 */
-	public function affectedRows() {
+	public function numRows() {
 		if ( isset($this->queryResult) ) {
 			return $this->queryResult->num_rows;
 		}
 		return null;
+	}
+	
+	/**
+	 * @return null|integer
+	 */
+	public function affectedRows() {
+		return $this->db->affected_rows;
 	}
 	
 	/**
@@ -371,12 +378,10 @@ class MySQL {
 	 * @return Where
 	 */
 	public function getWhereClause( $whereData ) {
-		if ( !isset($this->_where) ) {
-			$this->_where = new Where( $this->db );
-		}
-		$this->_where->parseClause( $whereData );
+		$where = new Where( $this->db );
+		$where->parseClause( $whereData );
 		
-		return $this->_where;
+		return $where;
 	}
 	
 	/**
