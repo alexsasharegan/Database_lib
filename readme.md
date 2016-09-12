@@ -104,11 +104,14 @@ MySQL::getSQLDate( string $timezone = "America/Phoenix" )
 # example
 echo MySQL::getSQLDate();
 # Outputs: '2016-09-06 14:04:15';
+
+echo MySQL::randomString(8);
+# Outputs: 'vayxwhrt';
 ```
 
 ### Instance Methods
 
-#### SELECT
+#### QUERY
 
 ```php
 <?php
@@ -160,7 +163,7 @@ $newUser = [
   'firstName' => 'John',
   'lastName'  => 'Doe',
   'status'    => 'NEW',
-  'created'   => $db->getSQLDate(),
+  'created'   => MySQL::getSQLDate(),
 ];
 
 # returns the insert id on success, FALSE on failure
@@ -197,6 +200,9 @@ $db->iterateResult(function ($row) {
 $db->getLastQuery();
 # returns "SELECT * FROM `users`"
 
+$db->getLogs();
+# returns an array of all executed queries
+
 $db->getResult();
 # returns the mysqli result object from the last query or NULL
 
@@ -204,7 +210,10 @@ $db->getError();
 # returns the last error message for the most recent MySQLi function call that can succeed or fail
 
 $db->affectRows();
-# returns the number of affected rows from the last query
+# returns the number of affected rows from the last query (UPDATE, DELETE)
+
+$db->numRows();
+# if a successful mysqli result object was returned, gets the number of rows in the result set 
 
 $db->insertId();
 # returns the insert id from the last query or NULL
@@ -216,11 +225,4 @@ $db->escape( string $stringToEscape );
 Database\MySQL::db
 # you can use all the mysqli methods from this prop
 
-# examples getting the error from mysqli:
-$db = new MySQL;
-$db->db->error;
-
-# with a different naming convention:
-$mysql = new MySQL;
-$mysql->db->error;
 ```
