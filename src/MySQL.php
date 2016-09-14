@@ -120,6 +120,7 @@ class MySQL {
 	 */
 	public static function getSQLDate( $timezone = "America/Phoenix" ) {
 		date_default_timezone_set( $timezone );
+		
 		return date( 'Y-m-d H:i:s' );
 	}
 	
@@ -154,7 +155,7 @@ class MySQL {
 		$i             = 0;
 		
 		for ( $i; $i < $length; $i++ ) {
-			$string .= $characters[mt_rand( 0, $charLastIndex )];
+			$string .= $characters[ mt_rand( 0, $charLastIndex ) ];
 		}
 		
 		return $string;
@@ -176,7 +177,7 @@ class MySQL {
 		$i             = 0;
 		
 		for ( $i; $i < $length; $i++ ) {
-			$string .= $characters[mt_rand( 0, $charLastIndex )];
+			$string .= $characters[ mt_rand( 0, $charLastIndex ) ];
 		}
 		
 		return $string;
@@ -360,10 +361,12 @@ class MySQL {
 		if ( isset($this->_query) ) {
 			return $this->_query;
 		}
+		
 		return null;
 	}
 	
 	/**
+	 * Takes an iterator (closure) to process each row of returned data.
 	 * @param callable $cb
 	 * @return MySQL $this
 	 */
@@ -381,12 +384,45 @@ class MySQL {
 	}
 	
 	/**
+	 * Applies a function against an accumulator ($carry) and each row of the last returned mysqli result object to reduce it to a single value.
+	 * @param callable $cb
+	 * @param string $carry
+	 * @return mixed|string
+	 */
+	public function reduceResult( callable $cb, $carry = '' ) {
+		if ( is_callable( $cb ) ) {
+			while ( $record = $this->queryResult->fetch_assoc() ) {
+				$carry = call_user_func( $cb, $carry, $record );
+			}
+			
+			return $carry;
+		}
+	}
+	
+	/**
+	 * Creates a new array with the results of calling the provided function on each row of the last returned mysqli result object.
+	 * @param callable $cb
+	 * @return array
+	 */
+	public function mapResult( callable $cb ) {
+		if ( is_callable( $cb ) ) {
+			$newArray = [];
+			while ( $record = $this->queryResult->fetch_assoc() ) {
+				$newArray[] = call_user_func( $cb, $record );
+			}
+			
+			return $newArray;
+		}
+	}
+	
+	/**
 	 * @return null|\mysqli_result
 	 */
 	public function getResult() {
 		if ( isset($this->queryResult) ) {
 			return $this->queryResult;
 		}
+		
 		return null;
 	}
 	
@@ -404,6 +440,7 @@ class MySQL {
 		if ( isset($this->queryResult) ) {
 			return $this->queryResult->num_rows;
 		}
+		
 		return null;
 	}
 	
@@ -422,6 +459,7 @@ class MySQL {
 		if ( $id !== 0 ) {
 			return $id;
 		}
+		
 		return null;
 	}
 	
@@ -460,12 +498,12 @@ class MySQL {
 		$this->iterateResult(
 			function ( $row ) use ( $table ) {
 				foreach ( $row as $index => $columnName ) {
-					$this->columns[$table][] = $columnName;
+					$this->columns[ $table ][] = $columnName;
 				}
 			}
 		);
 		
-		return $this->columns[$table];
+		return $this->columns[ $table ];
 	}
 	
 	/**
@@ -476,8 +514,8 @@ class MySQL {
 		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $insertList );
 		
 		return [
-			'keys' => implode( ',', $escapedKeyValuePairs['keys'] ),
-			'values' => implode( ',', $escapedKeyValuePairs['values'] )
+			'keys'   => implode( ',', $escapedKeyValuePairs['keys'] ),
+			'values' => implode( ',', $escapedKeyValuePairs['values'] ),
 		];
 	}
 	
@@ -513,6 +551,7 @@ class MySQL {
 		if ( $columnName === '*' ) {
 			return $columnName;
 		}
+		
 		return '`' . $this->escape( $columnName ) . '`';
 	}
 	
@@ -525,6 +564,7 @@ class MySQL {
 		foreach ( $colList as $col ) {
 			$escapedList[] = $this->escapeColumnName( $col );
 		}
+		
 		return $escapedList;
 	}
 	
@@ -568,7 +608,7 @@ class MySQL {
 		}
 		
 		return [
-			'keys' => $keys,
+			'keys'   => $keys,
 			'values' => $values,
 		];
 	}
