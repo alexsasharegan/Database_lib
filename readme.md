@@ -149,6 +149,24 @@ try {
 }
 ```
 
+#### SELECT
+
+```php
+<?php
+
+$db->select('users');
+// SELECT * FROM `users`
+
+$db->select('users', ['*'], [
+	'AND' => [
+		'group' => 'employees',
+		'status[!=]' => 'TERMINATED',
+		'conversions[>]' => 50,
+	]
+]);
+// SELECT * FROM `users` WHERE (`group`='employees') AND (`status`!='TERMINATED') AND (`conversions`>50)
+```
+
 #### INSERT
 
 ```php
@@ -196,6 +214,17 @@ $db->iterateResult(function ($row) {
 });
 # chainable method returns object instance
 
+$mappedResult = $db->mapResult(function ($row) {
+  return $row;
+});
+# applies the callback to each row of the mysqli result  
+# and returns an indexed array with the new values
+
+$reducedResult = $db->reduceResult(function ($carry, $row) {
+  return $carry . '<li>' . $row['first_name'] . ' ' . $row['last_name'] . '</li>'; 
+}, '');
+# applies the callback against the accumulator ($carry) and each row of the mysqli result
+# reducing them down to a single value
 
 $db->getLastQuery();
 # returns "SELECT * FROM `users`"
