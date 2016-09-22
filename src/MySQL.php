@@ -276,7 +276,7 @@ class MySQL {
 		
 		if ( ! $this->queryResult = $this->db->query( $this->_query ) )
 		{
-			throw new BadQuery( $this->_query, $this->db->error );
+			throw new BadQuery( $this->_query, $this->db->error, $this->getLogs() );
 		}
 		
 		return $this;
@@ -742,6 +742,12 @@ class MySQL {
 					$values[]  = "'$safeValue'";
 					break;
 				case 'boolean': # booleans
+					$safeKey = $this->db->real_escape_string( trim( $key ) );
+					$keys[]  = "`$safeKey`";
+					
+					$values[] = $val ? 1 : 0;
+					break;
+				case 'double': # doubles
 				case 'double': # doubles
 				case 'integer': # & integers don't need escaping or quotations
 					$safeKey = $this->db->real_escape_string( trim( $key ) );
