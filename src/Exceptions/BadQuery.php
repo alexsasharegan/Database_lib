@@ -2,9 +2,64 @@
 
 namespace Database\Exceptions;
 
+/**
+ * Class BadQuery
+ * @package Database\Exceptions
+ */
 class BadQuery extends \Exception implements \JsonSerializable {
 	
-	public function __construct( $query, $mysqliErrorMsg, array $logs, $code = 0, Exception $previous = NULL )
+	/**
+	 * @var string
+	 */
+	private $query;
+	
+	/**
+	 * @var array
+	 */
+	private $logs;
+	
+	/**
+	 * @return string
+	 */
+	public function getQuery()
+	{
+		return $this->query;
+	}
+	
+	/**
+	 * @param string $query
+	 */
+	public function setQuery( $query )
+	{
+		$this->query = $query;
+	}
+	
+	/**
+	 * @return array
+	 */
+	public function getLogs()
+	{
+		return $this->logs;
+	}
+	
+	/**
+	 * @param array $logs
+	 */
+	public function setLogs( $logs )
+	{
+		$this->logs = $logs;
+	}
+	
+	/**
+	 * BadQuery constructor.
+	 *
+	 * @param string          $query
+	 * @param int             $mysqliErrorMsg
+	 * @param array           $logs
+	 * @param int             $code
+	 * @param \Exception|NULL $previous
+	 */
+	public function __construct( $query, $mysqliErrorMsg, array $logs, $code = 0, \Exception $previous = NULL )
 	{
 		$this->query = $query;
 		$message     = $mysqliErrorMsg;
@@ -12,6 +67,9 @@ class BadQuery extends \Exception implements \JsonSerializable {
 		parent::__construct( $message, $code, $previous );
 	}
 	
+	/**
+	 * @return string
+	 */
 	public function __toString()
 	{
 		$logs = print_r( $this->logs, TRUE );
@@ -19,6 +77,9 @@ class BadQuery extends \Exception implements \JsonSerializable {
 		return __CLASS__ . ". [query: \"{$this->query}\"] {$this->message}\nQuery Logs: $logs";
 	}
 	
+	/**
+	 * @return array
+	 */
 	public function jsonSerialize()
 	{
 		return [

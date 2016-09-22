@@ -28,7 +28,8 @@ class Where {
 	
 	/**
 	 * @param string $type
-	 * @return $this
+	 *
+	 * @return Where|Where\Clause
 	 */
 	public function addClause( $type = 'AND' ) {
 		$clause           = new Where\Clause( $this->_db, $type );

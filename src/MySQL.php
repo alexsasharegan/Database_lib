@@ -59,6 +59,11 @@ class MySQL {
 	private $_logs = [];
 	
 	/**
+	 * @var array
+	 */
+	private $createdTables = [];
+	
+	/**
 	 * @param string $configFile
 	 * @param array  $options
 	 *
@@ -126,6 +131,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Get the current time formatted for MySQL
+	 *
 	 * @param string $timezone
 	 *
 	 * @return false|string
@@ -137,6 +144,13 @@ class MySQL {
 		return date( 'Y-m-d H:i:s' );
 	}
 	
+	/**
+	 * Get the current time formatted for MySQL
+	 *
+	 * @param string $timezone
+	 *
+	 * @return false|string
+	 */
 	public static function now( $timezone = "America/Phoenix" )
 	{
 		return self::getSQLDate( $timezone );
@@ -150,14 +164,18 @@ class MySQL {
 	/**
 	 * @var string
 	 */
-	public static $uc_alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	public static $numeric = '0123456789';
 	
 	/**
 	 * @var string
 	 */
-	public static $numeric = '0123456789';
+	public static $hex = '0123456789abcdef';
 	
 	/**
+	 * Generate a variable-length random string of alpha characters. Defaults to lower case.
+	 *
+	 * Set $caseSensitive = TRUE to return both upper & lower case alpha characters.
+	 *
 	 * @param      $length
 	 * @param bool $caseSensitive
 	 *
@@ -167,17 +185,17 @@ class MySQL {
 	{
 		if ( $caseSensitive )
 		{
-			$characters = self::$lc_alpha . self::$uc_alpha;
+			$characters = self::$lc_alpha . strtoupper( self::$lc_alpha );
 		}
 		else
 		{
 			$characters = self::$lc_alpha;
 		}
+		
 		$charLastIndex = (strlen( $characters ) - 1);
 		$string        = '';
-		$i             = 0;
 		
-		for ( $i; $i < $length; $i++ )
+		for ( $i = 0; $i < $length; $i++ )
 		{
 			$string .= $characters[ mt_rand( 0, $charLastIndex ) ];
 		}
@@ -186,6 +204,10 @@ class MySQL {
 	}
 	
 	/**
+	 * Generate a variable-length random string of alpha-numeric characters. Defaults to lower case.
+	 *
+	 * Set $caseSensitive = TRUE to return both upper & lower case alpha-numeric characters.
+	 *
 	 * @param      $length
 	 * @param bool $caseSensitive
 	 *
@@ -195,17 +217,17 @@ class MySQL {
 	{
 		if ( $caseSensitive )
 		{
-			$characters = self::$numeric . self::$lc_alpha . self::$uc_alpha;
+			$characters = self::$numeric . self::$lc_alpha . strtoupper( self::$lc_alpha );
 		}
 		else
 		{
 			$characters = self::$numeric . self::$lc_alpha;
 		}
+		
 		$charLastIndex = (strlen( $characters ) - 1);
 		$string        = '';
-		$i             = 0;
 		
-		for ( $i; $i < $length; $i++ )
+		for ( $i = 0; $i < $length; $i++ )
 		{
 			$string .= $characters[ mt_rand( 0, $charLastIndex ) ];
 		}
@@ -214,7 +236,30 @@ class MySQL {
 	}
 	
 	/**
-	 * MySQL constructor.
+	 * Generate a variable-length random string of hexidecimal characters. Defaults to lower case.
+	 *
+	 * @param      $length
+	 *
+	 * @return string
+	 */
+	public static function randomHex( $length )
+	{
+		$characters    = self::$hex;
+		$charLastIndex = (strlen( $characters ) - 1);
+		$string        = '';
+		
+		for ( $i = 0; $i < $length; $i++ )
+		{
+			$string .= $characters[ mt_rand( 0, $charLastIndex ) ];
+		}
+		
+		return $string;
+	}
+	
+	/**
+	 * MySQL constructor. Pass in the path to a json config file.
+	 *
+	 * Recommended to always use __DIR__ to qualify the path.
 	 *
 	 * @param string $configFile
 	 * @param array  $options
@@ -262,14 +307,22 @@ class MySQL {
 	}
 	
 	/**
-	 * closes the connection to mysql
+	 * Automatically closes the connection to mysql
 	 */
 	function __destruct()
 	{
-		$this->db->close();
+		if ( ! is_null( $this->db ) )
+		{
+			$this->db->close();
+		}
 	}
 	
 	/**
+	 * Perform a raw SQL query. Does not return the result object,
+	 * but instead returns the MySQL instance for chaining.
+	 *
+	 * @see MySQL::getResult() for getting the raw result object.
+	 *
 	 * @param string $query
 	 *
 	 * @return MySQL $this
@@ -288,6 +341,16 @@ class MySQL {
 	}
 	
 	/**
+	 * Select a record set by passing in a table,
+	 * an array of fields to select,
+	 * and [optional] a where clause.
+	 * Returns MySQL instance for chaining
+	 *
+	 * Where clauses can be:
+	 * - a string (the raw statement: "WHERE `field`=value"; You must escape values)
+	 * - an array: [ 'key' => value ] @see http://medoo.in/api/where since their api is similar
+	 * - an integer: this will yield a "WHERE `id`=$intValue" where clause for convenience
+	 *
 	 * @param        $table
 	 * @param array  $columns
 	 * @param string $where
@@ -297,20 +360,31 @@ class MySQL {
 	public function select( $table, $columns = [ '*' ], $where = '' )
 	{
 		$columns = implode( ', ', $this->escapeColumnNames( $columns ) );
+		
 		if ( is_array( $where ) )
 		{
 			$WHERE = $this->getWhereClause( $where );
+		}
+		elseif ( is_integer( $where ) )
+		{
+			$WHERE = "WHERE `id`={$where}";
 		}
 		else
 		{
 			$WHERE = $where;
 		}
+		
 		$this->query( "SELECT $columns FROM `$table` $WHERE" );
 		
 		return $this;
 	}
 	
 	/**
+	 * Insert a single row by passing the table,
+	 * an associative array of fields => values to insert,
+	 * and [optional] a boolean whether or not to update on duplicate with the same data set
+	 * Returns the insert id or false
+	 *
 	 * @param string $table
 	 * @param array  $insertPairs
 	 * @param bool   $update
@@ -347,6 +421,11 @@ class MySQL {
 	}
 	
 	/**
+	 * Insert a single row by passing the table,
+	 * an associative array of fields => values to insert,
+	 * and an associative array of fields => values to update on duplicate
+	 * Returns the insert id or false
+	 *
 	 * @param string $table
 	 * @param array  $insertPairs
 	 * @param array  $updatePairs
@@ -376,11 +455,21 @@ class MySQL {
 	}
 	
 	/**
+	 * Update records by passing the table,
+	 * an associative array of fields => values to update,
+	 * and [optional] a where clause
+	 * Returns the number of rows affected by the query
+	 *
+	 * Where clauses can be:
+	 * - a string (the raw statement: "WHERE `field`=value"; You must escape values)
+	 * - an array: [ 'key' => value ] @see http://medoo.in/api/where since their api is similar
+	 * - an integer: this will yield a "WHERE `id`=$intValue" where clause for convenience
+	 *
 	 * @param        $table
 	 * @param        $data
 	 * @param string $where
 	 *
-	 * @return $this
+	 * @return int
 	 */
 	public function update( $table, $data, $where = '' )
 	{
@@ -388,6 +477,10 @@ class MySQL {
 		if ( is_array( $where ) )
 		{
 			$WHERE = $this->getWhereClause( $where );
+		}
+		elseif ( is_integer( $where ) )
+		{
+			$WHERE = "WHERE `id`={$where}";
 		}
 		else
 		{
@@ -399,6 +492,15 @@ class MySQL {
 	}
 	
 	/**
+	 * Delete records by passing the table
+	 * and [optional] a where clause
+	 * Returns the number of rows affected by the query
+	 *
+	 * Where clauses can be:
+	 * - a string (the raw statement: "WHERE `field`=value"; You must escape values)
+	 * - an array: [ 'key' => value ] @see http://medoo.in/api/where since their api is similar
+	 * - an integer: this will yield a "WHERE `id`=$intValue" where clause for convenience
+	 *
 	 * @param        $table
 	 * @param string $where
 	 *
@@ -419,6 +521,15 @@ class MySQL {
 		return $this->affectedRows();
 	}
 	
+	/**
+	 * Create a table
+	 *
+	 * @param          $tableName
+	 * @param \Closure $f
+	 * @param bool     $tableShouldBeUnique
+	 *
+	 * @return \mysqli_result|null
+	 */
 	public function createTable( $tableName, \Closure $f, $tableShouldBeUnique = FALSE )
 	{
 		if ( $tableShouldBeUnique )
@@ -434,9 +545,18 @@ class MySQL {
 		
 		$this->query( $createStatement );
 		
+		$this->createdTables[] = $tableBuilder->getTableName();
+		
 		return $this->getResult();
 	}
 	
+	/**
+	 * Drop a table
+	 *
+	 * @param $table
+	 *
+	 * @return \mysqli_result|null
+	 */
 	public function dropTable( $table )
 	{
 		$statement = "DROP TABLE {$table}";
@@ -448,13 +568,15 @@ class MySQL {
 	/**
 	 * @param string $query
 	 */
-	public function setQuery( $query )
+	protected function setQuery( $query )
 	{
 		$this->_query  = $query;
 		$this->_logs[] = $query;
 	}
 	
 	/**
+	 * Returns the last query executed
+	 *
 	 * @return null|string
 	 */
 	public function getLastQuery()
@@ -494,47 +616,44 @@ class MySQL {
 	 * Applies a function against an accumulator ($carry) and each row of the last returned mysqli result object to
 	 * reduce it to a single value.
 	 *
-	 * @param callable $cb
+	 * @param \Closure $cb
 	 * @param string   $carry
 	 *
 	 * @return mixed|string
 	 */
-	public function reduceResult( callable $cb, $carry = '' )
+	public function reduceResult( \Closure $cb, $carry = '' )
 	{
-		if ( is_callable( $cb ) )
+		while ( $record = $this->queryResult->fetch_assoc() )
 		{
-			while ( $record = $this->queryResult->fetch_assoc() )
-			{
-				$carry = call_user_func( $cb, $carry, $record );
-			}
-			
-			return $carry;
+			$carry = $cb( $carry, $record );
 		}
+		
+		return $carry;
 	}
 	
 	/**
 	 * Creates a new array with the results of calling the provided function on each row of the last returned mysqli
 	 * result object.
 	 *
-	 * @param callable $cb
+	 * @param \Closure $cb
 	 *
 	 * @return array
 	 */
-	public function mapResult( callable $cb )
+	public function mapResult( \Closure $cb )
 	{
-		if ( is_callable( $cb ) )
+		$newArray = [];
+		
+		while ( $record = $this->queryResult->fetch_assoc() )
 		{
-			$newArray = [];
-			while ( $record = $this->queryResult->fetch_assoc() )
-			{
-				$newArray[] = call_user_func( $cb, $record );
-			}
-			
-			return $newArray;
+			$newArray[] = $cb( $record );
 		}
+		
+		return $newArray;
 	}
 	
 	/**
+	 * Returns the last query's result object
+	 *
 	 * @return null|\mysqli_result
 	 */
 	public function getResult()
@@ -548,6 +667,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Get the last error from mysqli
+	 *
 	 * @return string
 	 */
 	public function getError()
@@ -556,6 +677,9 @@ class MySQL {
 	}
 	
 	/**
+	 * Returns the number of rows from the last query
+	 * (must be done before iterating over the result)
+	 *
 	 * @return null|integer
 	 */
 	public function numRows()
@@ -569,6 +693,9 @@ class MySQL {
 	}
 	
 	/**
+	 * Returns the number of rows affected by the last query
+	 * (inserts, updates, deletes)
+	 *
 	 * @return null|integer
 	 */
 	public function affectedRows()
@@ -577,6 +704,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Returns the last inserted id from mysqli
+	 *
 	 * @return null|integer
 	 */
 	public function insertId()
@@ -591,6 +720,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Gets an array of all the queries performed by the instance
+	 *
 	 * @return array
 	 */
 	public function getLogs()
@@ -603,7 +734,7 @@ class MySQL {
 	 *
 	 * @return Where
 	 */
-	public function getWhereClause( $whereData )
+	protected function getWhereClause( $whereData )
 	{
 		$where = new Where( $this->db );
 		$where->parseClause( $whereData );
@@ -612,6 +743,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Get an array of all the columns in a given table [, and a given database ]
+	 *
 	 * @param string $table
 	 * @param string $database
 	 *
@@ -642,6 +775,10 @@ class MySQL {
 	}
 	
 	/**
+	 * Escapes an associative array of [ keys => values ]
+	 * and returns an array with the escaped data
+	 * at $returnArray['keys'] & $returnArray['values']
+	 *
 	 * @param array $insertList
 	 *
 	 * @return array
@@ -657,6 +794,9 @@ class MySQL {
 	}
 	
 	/**
+	 * Escapes an associative array of [ keys => values ]
+	 * and returns an Update Statement string with the escaped data
+	 *
 	 * @param array $data
 	 *
 	 * @return string
@@ -676,6 +816,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Escapes a value
+	 *
 	 * @param $string
 	 *
 	 * @return string
@@ -686,6 +828,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Wraps a column name in backticks
+	 *
 	 * @param $columnName
 	 *
 	 * @return string
@@ -701,6 +845,9 @@ class MySQL {
 	}
 	
 	/**
+	 * Wraps an array of columns in backticks
+	 * and returns the escaped array
+	 *
 	 * @param array $colList
 	 *
 	 * @return array
@@ -772,6 +919,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Checks if an array is associative by asserting against numeric indices
+	 *
 	 * @param array $array
 	 *
 	 * @return bool
@@ -779,6 +928,22 @@ class MySQL {
 	public function isAssoc( array $array )
 	{
 		return array_keys( $array ) !== range( 0, count( $array ) - 1 );
+	}
+	
+	/**
+	 * @return array
+	 */
+	public function getCreatedTables()
+	{
+		return $this->createdTables;
+	}
+	
+	/**
+	 * @return array
+	 */
+	public function getLastCreatedTable()
+	{
+		return end( $this->createdTables );
 	}
 	
 }
