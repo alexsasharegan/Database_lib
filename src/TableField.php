@@ -54,6 +54,8 @@ class TableField {
 	 */
 	private $foreignKeyField = 'id';
 	
+	private $_userInputType;
+	
 	/**
 	 * @return string
 	 */
@@ -94,6 +96,8 @@ class TableField {
 	 */
 	public function isType( $type, $modifier = NULL )
 	{
+		$this->_userInputType = $type;
+		
 		switch ( strtolower( $type ) )
 		{
 			case 'integer':
@@ -103,7 +107,7 @@ class TableField {
 					$modifier = $this->integer;
 				}
 				
-				$this->modifiers[] = "int({$modifier})";
+				$this->modifiers[] = "({$modifier})";
 				$this->type        = 'int';
 				break;
 			case stristr( strtolower( $type ), 'text' ) . stristr( strtolower( $type ), 'text', TRUE ):
@@ -112,16 +116,15 @@ class TableField {
 					$modifier = "COLLATE " . $this->collation;
 				}
 				
-				$this->modifiers[] = "{$type} {$modifier}";
-				$this->type        = 'text';
+				$this->modifiers[] = $modifier;
+				$this->type        = $type;
 				break;
 			case strtolower( 'bool' ):
 			case strtolower( 'boolean' ):
-				$this->modifiers[] = "tinyint (1) NOT NULL";
-				$this->type        = 'boolean';
+				$this->modifiers[] = "(1) NOT NULL";
+				$this->type        = 'tinyint';
 				break;
 			case strtolower( 'float' ):
-				$this->modifiers[] = "float";
 				$this->type        = 'float';
 				break;
 			case strtolower( 'dec' ):
@@ -130,7 +133,7 @@ class TableField {
 				{
 					$modifier = 0;
 				}
-				$this->modifiers[] = "decimal(10,{$modifier})";
+				$this->modifiers[] = "(10,{$modifier})";
 				$this->type        = 'decimal';
 				break;
 			default:
@@ -197,7 +200,7 @@ class TableField {
 	 */
 	public function notNull()
 	{
-		if ( ! $this->type === 'boolean')
+		if ( ! strpos( strtolower( $this->getUserInputType() ), 'bool' ) )
 		{
 			$this->modifiers[] = 'NOT NULL';
 		}
@@ -237,6 +240,14 @@ class TableField {
 		$modifiers = implode( ' ', $this->modifiers );
 		
 		return "`{$this->fieldName}` {$this->type} {$modifiers}";
+	}
+	
+	/**
+	 * @return mixed
+	 */
+	public function getUserInputType()
+	{
+		return $this->_userInputType;
 	}
 	
 }
