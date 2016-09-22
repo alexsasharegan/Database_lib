@@ -137,6 +137,11 @@ class MySQL {
 		return date( 'Y-m-d H:i:s' );
 	}
 	
+	public static function now( $timezone = "America/Phoenix" )
+	{
+		return self::getSQLDate( $timezone );
+	}
+	
 	/**
 	 * @var string
 	 */
