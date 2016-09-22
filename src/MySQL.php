@@ -3,6 +3,7 @@
 namespace Database;
 
 use Database\Exceptions\BadQuery;
+use Database\Utils\Timer;
 
 /**
  * Class MySQL
@@ -332,10 +333,14 @@ class MySQL {
 	{
 		$this->setQuery( $query );
 		
+		$time = new Timer();
+		
 		if ( ! $this->queryResult = $this->db->query( $this->_query ) )
 		{
 			throw new BadQuery( $this->_query, $this->db->error, $this->getLogs() );
 		}
+		
+		$this->_logs[] = [ 'query' => array_pop( $this->_logs ), 'time' => $time->stop(), ];
 		
 		return $this;
 	}
