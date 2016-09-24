@@ -125,7 +125,7 @@ class TableField {
 				$this->type        = 'tinyint';
 				break;
 			case strtolower( 'float' ):
-				$this->type        = 'float';
+				$this->type = 'float';
 				break;
 			case strtolower( 'dec' ):
 			case strtolower( 'decimal' ):

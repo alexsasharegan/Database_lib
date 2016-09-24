@@ -54,7 +54,7 @@ class TableBuilder {
 	 */
 	public function __construct( $tableName )
 	{
-		$this->tableName = $tableName;
+		$this->tableName = (string) $tableName;
 		
 		$this->addField( $this->primaryKey )->isType( 'int' )->unsigned()->notNull()->autoIncrement();
 	}

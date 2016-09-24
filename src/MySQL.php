@@ -65,6 +65,11 @@ class MySQL {
 	private $createdTables = [];
 	
 	/**
+	 * @var array
+	 */
+	private $_ids = [];
+	
+	/**
 	 * @param string $configFile
 	 * @param array  $options
 	 *
@@ -77,7 +82,7 @@ class MySQL {
 		{
 			$host     = $options['host'];
 			$database = $options['database'];
-			$username = $options['_username'];
+			$username = $options['username'];
 			$password = $options['password'];
 		}
 		elseif ( ! empty($configFile) && empty($options) )
@@ -93,7 +98,7 @@ class MySQL {
 			$config   = json_decode( file_get_contents( $configFile ) );
 			$host     = ! empty($options['host']) ? $options['host'] : $config->host;
 			$database = ! empty($options['database']) ? $options['database'] : $config->database;
-			$username = ! empty($options['_username']) ? $options['_username'] : $config->username;
+			$username = ! empty($options['username']) ? $options['username'] : $config->username;
 			$password = ! empty($options['password']) ? $options['password'] : $config->password;
 		}
 		
@@ -107,7 +112,7 @@ class MySQL {
 		
 		if ( ! $mysqli->set_charset( 'utf8' ) )
 		{
-			exit("Error loading character set utf8 for db $database: %s\n" . $mysqli->error);
+			exit("Error setting character set = utf-8 for database $database: %s\n" . $mysqli->error);
 		}
 		
 		return $mysqli;
@@ -193,15 +198,7 @@ class MySQL {
 			$characters = self::$lc_alpha;
 		}
 		
-		$charLastIndex = (strlen( $characters ) - 1);
-		$string        = '';
-		
-		for ( $i = 0; $i < $length; $i++ )
-		{
-			$string .= $characters[ mt_rand( 0, $charLastIndex ) ];
-		}
-		
-		return $string;
+		return self::_randomString( $characters, $length );
 	}
 	
 	/**
@@ -225,15 +222,7 @@ class MySQL {
 			$characters = self::$numeric . self::$lc_alpha;
 		}
 		
-		$charLastIndex = (strlen( $characters ) - 1);
-		$string        = '';
-		
-		for ( $i = 0; $i < $length; $i++ )
-		{
-			$string .= $characters[ mt_rand( 0, $charLastIndex ) ];
-		}
-		
-		return $string;
+		return self::_randomString( $characters, $length );
 	}
 	
 	/**
@@ -245,13 +234,25 @@ class MySQL {
 	 */
 	public static function randomHex( $length )
 	{
-		$characters    = self::$hex;
-		$charLastIndex = (strlen( $characters ) - 1);
+		$characters = self::$hex;
+		
+		return self::_randomString( $characters, $length );
+	}
+	
+	/**
+	 * @param $characterSet
+	 * @param $length
+	 *
+	 * @return string
+	 */
+	private static function _randomString( $characterSet, $length )
+	{
+		$charLastIndex = (strlen( $characterSet ) - 1);
 		$string        = '';
 		
 		for ( $i = 0; $i < $length; $i++ )
 		{
-			$string .= $characters[ mt_rand( 0, $charLastIndex ) ];
+			$string .= $characterSet[ mt_rand( 0, $charLastIndex ) ];
 		}
 		
 		return $string;
@@ -272,7 +273,7 @@ class MySQL {
 		{
 			$this->_host     = $options['host'];
 			$this->_database = $options['database'];
-			$this->_username = $options['_username'];
+			$this->_username = $options['username'];
 			$this->_password = $options['password'];
 		}
 		elseif ( ! empty($configFile) && empty($options) )
@@ -288,7 +289,7 @@ class MySQL {
 			$config          = json_decode( file_get_contents( $configFile ) );
 			$this->_host     = ! empty($options['host']) ? $options['host'] : $config->host;
 			$this->_database = ! empty($options['database']) ? $options['database'] : $config->database;
-			$this->_username = ! empty($options['_username']) ? $options['_username'] : $config->username;
+			$this->_username = ! empty($options['username']) ? $options['username'] : $config->username;
 			$this->_password = ! empty($options['password']) ? $options['password'] : $config->password;
 		}
 		
@@ -305,6 +306,33 @@ class MySQL {
 		}
 		
 		$this->db = $mysqli;
+	}
+	
+	/**
+	 * Switch a database by passing the database name.
+	 * Automatically closes the previous connection.
+	 * (uses current connection settings)
+	 *
+	 * Returns the instance for chaining.
+	 *
+	 * @param $database
+	 *
+	 * @return $this
+	 */
+	public function switchDatabase( $database )
+	{
+		$this->db->close();
+		
+		$db = self::connect( NULL, [
+			'host'     => $this->_host,
+			'database' => $database,
+			'username' => $this->_username,
+			'password' => $this->_password,
+		] );
+		
+		$this->db = $db;
+		
+		return $this;
 	}
 	
 	/**
@@ -364,22 +392,28 @@ class MySQL {
 	 */
 	public function select( $table, $columns = [ '*' ], $where = '' )
 	{
-		$columns = implode( ', ', $this->escapeColumnNames( $columns ) );
-		
-		if ( is_array( $where ) )
+		if ( func_num_args() === 2 && is_integer( func_get_arg( 1 ) ) )
 		{
-			$WHERE = $this->getWhereClause( $where );
+			$where   = func_get_arg( 1 );
+			$columns = [ '*' ];
 		}
-		elseif ( is_integer( $where ) )
+		
+		$columns = implode( ',', $this->escapeColumnNames( $columns ) );
+		
+		if ( is_integer( $where ) )
 		{
 			$WHERE = "WHERE `id`={$where}";
+		}
+		elseif ( is_array( $where ) )
+		{
+			$WHERE = $this->getWhereClause( $where );
 		}
 		else
 		{
 			$WHERE = $where;
 		}
 		
-		$this->query( "SELECT $columns FROM `$table` $WHERE" );
+		$this->query( "SELECT {$columns} FROM `{$table}` $WHERE" );
 		
 		return $this;
 	}
@@ -407,17 +441,19 @@ class MySQL {
 		
 		if ( $update )
 		{
-			$updateStr = $this->buildUpdate( $insertPairs );
-			$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE $updateStr;" );
+			$updateStatement = $this->buildUpdate( $insertPairs );
+			$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE {$updateStatement};" );
 		}
 		else
 		{
-			$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']});" );
+			$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']});" );
 		}
 		
 		if ( $this->getResult() === TRUE )
 		{
-			return $this->db->insert_id;
+			$this->pushId( $this->insertId() );
+			
+			return $this->insertId();
 		}
 		else
 		{
@@ -435,23 +471,27 @@ class MySQL {
 	 * @param array  $insertPairs
 	 * @param array  $updatePairs
 	 *
+	 * @throws \InvalidArgumentException
+	 *
 	 * @return bool|integer
 	 */
 	public function insertOnUpdate( $table, array $insertPairs, array $updatePairs )
 	{
 		if ( empty($insertPairs) || empty($updatePairs) )
 		{
-			return FALSE;
+			throw new \InvalidArgumentException( "Insert data cannot be empty." );
 		}
 		
-		$escapedInserts = $this->buildInserts( $insertPairs );
-		$updateStr      = $this->buildUpdate( $updatePairs );
+		$escapedInserts  = $this->buildInserts( $insertPairs );
+		$updateStatement = $this->buildUpdate( $updatePairs );
 		
-		$this->query( "INSERT INTO `$table` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE $updateStr;" );
+		$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE {$updateStatement};" );
 		
 		if ( $this->getResult() === TRUE )
 		{
-			return $this->db->insert_id;
+			$this->pushId( $this->insertId() );
+			
+			return $this->insertId();
 		}
 		else
 		{
@@ -479,19 +519,21 @@ class MySQL {
 	public function update( $table, $data, $where = '' )
 	{
 		$escapedData = $this->buildUpdate( $data );
-		if ( is_array( $where ) )
-		{
-			$WHERE = $this->getWhereClause( $where );
-		}
-		elseif ( is_integer( $where ) )
+		
+		if ( is_integer( $where ) )
 		{
 			$WHERE = "WHERE `id`={$where}";
+		}
+		elseif ( is_array( $where ) )
+		{
+			$WHERE = $this->getWhereClause( $where );
 		}
 		else
 		{
 			$WHERE = $where;
 		}
-		$this->query( "UPDATE `$table` SET {$escapedData} $WHERE" );
+		
+		$this->query( "UPDATE `{$table}` SET {$escapedData} {$WHERE}" );
 		
 		return $this->affectedRows();
 	}
@@ -513,7 +555,11 @@ class MySQL {
 	 */
 	public function delete( $table, $where = '' )
 	{
-		if ( is_array( $where ) )
+		if ( is_integer( $where ) )
+		{
+			$WHERE = "WHERE `id`={$where}";
+		}
+		elseif ( is_array( $where ) )
 		{
 			$WHERE = $this->getWhereClause( $where );
 		}
@@ -521,7 +567,8 @@ class MySQL {
 		{
 			$WHERE = $where;
 		}
-		$this->query( "DELETE FROM `$table` $WHERE" );
+		
+		$this->query( "DELETE FROM `{$table}` {$WHERE}" );
 		
 		return $this->affectedRows();
 	}
@@ -530,12 +577,12 @@ class MySQL {
 	 * Create a table
 	 *
 	 * @param          $tableName
-	 * @param \Closure $f
+	 * @param \Closure $schemaFunction
 	 * @param bool     $tableShouldBeUnique
 	 *
 	 * @return \mysqli_result|null
 	 */
-	public function createTable( $tableName, \Closure $f, $tableShouldBeUnique = FALSE )
+	public function createTable( $tableName, \Closure $schemaFunction, $tableShouldBeUnique = FALSE )
 	{
 		if ( $tableShouldBeUnique )
 		{
@@ -544,7 +591,7 @@ class MySQL {
 		
 		$tableBuilder = new TableBuilder( $tableName );
 		
-		$f( $tableBuilder );
+		$schemaFunction( $tableBuilder );
 		
 		$createStatement = $tableBuilder->render();
 		
@@ -610,6 +657,7 @@ class MySQL {
 			while ( $record = $this->queryResult->fetch_assoc() )
 			{
 				$params = array_merge( [ $record ], $args );
+				
 				call_user_func_array( $cb, $params );
 			}
 		}
@@ -716,12 +764,77 @@ class MySQL {
 	public function insertId()
 	{
 		$id = $this->db->insert_id;
-		if ( $id !== 0 )
+		
+		if ( $id > 0 )
 		{
 			return $id;
 		}
 		
 		return NULL;
+	}
+	
+	/**
+	 * Returns the last inserted id
+	 * Alias of MySQL::insertId
+	 *
+	 * @see MySQL::insertId()
+	 *
+	 * @return int|null
+	 */
+	public function lastId()
+	{
+		return $this->insertId();
+	}
+	
+	/**
+	 * Returns the last inserted id
+	 * Alias of MySQL::insertId
+	 *
+	 * @see MySQL::insertId()
+	 *
+	 * @return int|null
+	 */
+	public function id()
+	{
+		return $this->insertId();
+	}
+	
+	/**
+	 * Inserts performed using the insert methods
+	 * save the inserted ids to an array.
+	 *
+	 * @return array
+	 */
+	public function getInsertedIds()
+	{
+		return $this->_ids;
+	}
+	
+	/**
+	 * ALias for getInsertedIds
+	 *
+	 * @see MySQL::getInsertedIds()
+	 *
+	 * @return array
+	 */
+	public function getIds()
+	{
+		return $this->getInsertedIds();
+	}
+	
+	/**
+	 * @param $id
+	 *
+	 * @return int
+	 */
+	private function pushId( $id )
+	{
+		if ( $id > 0 )
+		{
+			$this->_ids[] = $id;
+		}
+		
+		return count( $this->_ids );
 	}
 	
 	/**
@@ -829,6 +942,8 @@ class MySQL {
 	 */
 	public function escape( $string )
 	{
+		settype( $string, 'string' );
+		
 		return $this->db->real_escape_string( $string );
 	}
 	
@@ -884,30 +999,30 @@ class MySQL {
 			{
 				case 'object': # handle objects
 				case 'array': # and arrays the same
-					$safeKey = $this->db->real_escape_string( trim( $key ) );
+					$safeKey = $this->escape( trim( $key ) );
 					$keys[]  = ("`$safeKey`");
 					
 					$jsonStrValue = json_encode( $val );
-					$safeValue    = $this->db->real_escape_string( $jsonStrValue );
+					$safeValue    = $this->escape( $jsonStrValue );
 					$values[]     = "'$safeValue'";
 					break;
 				case 'string': # escape key & value and wrap in quotes
-					$safeKey = $this->db->real_escape_string( trim( $key ) );
+					$safeKey = $this->escape( trim( $key ) );
 					$keys[]  = ("`$safeKey`");
 					
-					$safeValue = $this->db->real_escape_string( $val );
+					$safeValue = $this->escape( $val );
 					$values[]  = "'$safeValue'";
 					break;
 				case 'boolean': # booleans
-					$safeKey = $this->db->real_escape_string( trim( $key ) );
+					$safeKey = $this->escape( trim( $key ) );
 					$keys[]  = "`$safeKey`";
 					
 					$values[] = $val ? 1 : 0;
 					break;
-				case 'double': # doubles
+				case 'NULL': # NULL
 				case 'double': # doubles
 				case 'integer': # & integers don't need escaping or quotations
-					$safeKey = $this->db->real_escape_string( trim( $key ) );
+					$safeKey = $this->escape( trim( $key ) );
 					$keys[]  = "`$safeKey`";
 					
 					$values[] = $val;
@@ -936,6 +1051,8 @@ class MySQL {
 	}
 	
 	/**
+	 * Returns an array of any tables created by this instance
+	 *
 	 * @return array
 	 */
 	public function getCreatedTables()
@@ -943,12 +1060,34 @@ class MySQL {
 		return $this->createdTables;
 	}
 	
+	
 	/**
-	 * @return array
+	 * Returns the [string] name of the last created table
+	 *
+	 * @return string|null
 	 */
 	public function getLastCreatedTable()
 	{
-		return end( $this->createdTables );
+		return $this->createdTables[ (count( $this->createdTables ) - 1) ];
+	}
+	
+	/**
+	 * Drop all tables created by this instance.
+	 *
+	 * @throws BadQuery if drop table is unsuccessful
+	 */
+	public function dropAllCreatedTables()
+	{
+		array_map(
+			function ( $tableName )
+			{
+				if ( ! $this->dropTable( $tableName ) )
+				{
+					throw new BadQuery( $this->getLastQuery(), $this->getError(), $this->getLogs() );
+				}
+			}
+			, $this->getCreatedTables()
+		);
 	}
 	
 }

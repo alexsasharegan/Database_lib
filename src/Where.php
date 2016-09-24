@@ -20,9 +20,11 @@ class Where {
 	
 	/**
 	 * Where constructor.
+	 *
 	 * @param \mysqli $mysqli
 	 */
-	public function __construct( \mysqli $mysqli ) {
+	public function __construct( \mysqli $mysqli )
+	{
 		$this->_db = $mysqli;
 	}
 	
@@ -31,7 +33,8 @@ class Where {
 	 *
 	 * @return Where|Where\Clause
 	 */
-	public function addClause( $type = 'AND' ) {
+	public function addClause( $type = 'AND' )
+	{
 		$clause           = new Where\Clause( $this->_db, $type );
 		$this->_clauses[] = $clause;
 		
@@ -40,24 +43,37 @@ class Where {
 	
 	/**
 	 * @param array $whereClauses
+	 *
 	 * @return string
 	 */
-	public function parseClause( $whereClauses = [] ) {
-		if ( empty($whereClauses) ) {
+	public function parseClause( $whereClauses = [] )
+	{
+		if ( empty($whereClauses) )
+		{
 			return strval( $this );
 		}
 		
-		$walkRecursive = function ( $value, $key, $clause = null ) use ( &$walkRecursive ) {
-			if ( Where\Clause::isValidType( $key ) && is_array( $value ) && is_null( $clause ) ) {
+		$walkRecursive = function ( $value, $key, $clause = NULL ) use ( &$walkRecursive )
+		{
+			
+			if ( Where\Clause::isValidType( $key ) && is_array( $value ) && is_null( $clause ) )
+			{
 				$clause = $this->addClause( $key );
-				foreach ( $value as $index => $data ) {
+				
+				foreach ( $value as $index => $data )
+				{
 					$walkRecursive( $data, $index, $clause );
 				}
-			} elseif ( !Where\Clause::isValidType( $key ) && !is_array( $value ) && !is_null( $clause ) ) {
+			}
+			elseif ( ! Where\Clause::isValidType( $key ) && ! is_array( $value ) && ! is_null( $clause ) )
+			{
 				$clause->add( $key, $value );
-			} elseif ( !Where\Clause::isValidType( $key ) && !is_array( $value ) && is_null( $clause ) ) {
+			}
+			elseif ( ! Where\Clause::isValidType( $key ) && ! is_array( $value ) && is_null( $clause ) )
+			{
 				$this->addClause()->add( $key, $value );
 			}
+			
 		};
 		
 		array_walk( $whereClauses, $walkRecursive );
@@ -68,13 +84,17 @@ class Where {
 	/**
 	 * @return string
 	 */
-	public function __toString() {
-		if ( empty($this->_clauses) ) {
+	public function __toString()
+	{
+		if ( empty($this->_clauses) )
+		{
 			return '';
 		}
 		
 		$list = [];
-		foreach ( $this->_clauses as $clause ) {
+		
+		foreach ( $this->_clauses as $clause )
+		{
 			$list[] = strval( $clause );
 		}
 		

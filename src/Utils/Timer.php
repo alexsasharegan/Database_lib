@@ -28,23 +28,28 @@ class Timer {
 	 * @var null
 	 */
 	public $time = NULL;
+	/**
+	 * @var int
+	 */
+	private $precision;
 	
 	/**
 	 * @return float
 	 */
 	private function now()
 	{
-		list($usec, $sec) = explode( " ", microtime() );
-		
-		return ((float) $usec + (float) $sec);
+		return microtime( TRUE );
 	}
 	
 	/**
 	 * Timer constructor.
+	 *
+	 * @param int $precision
 	 */
-	function __construct()
+	function __construct( $precision = 3 )
 	{
-		$this->start = $this->now();
+		$this->start     = $this->now();
+		$this->precision = $precision;
 	}
 	
 	/**
@@ -53,7 +58,7 @@ class Timer {
 	public function stop()
 	{
 		$this->end = $this->now();
-		$this->setTime( round( $this->end - $this->start, 3 ) );
+		$this->setTime( $this->calcTime( $this->now(), $this->start ) );
 		
 		return $this->time;
 	}
@@ -66,7 +71,7 @@ class Timer {
 		if ( ! is_null( $this->time ) ):
 			return $this->time;
 		else:
-			return round( $this->now() - $this->start, 3 );
+			return $this->calcTime( $this->now(), $this->start );
 		endif;
 	}
 	
@@ -75,7 +80,7 @@ class Timer {
 	 */
 	public function getCurrentTime()
 	{
-		return round( $this->now() - $this->start, 3 );
+		return $this->calcTime( $this->now(), $this->start );
 	}
 	
 	/**
@@ -100,5 +105,10 @@ class Timer {
 		$this->time = $time;
 		
 		return $this;
+	}
+	
+	private function calcTime( $end, $start )
+	{
+		return round( ($end - $start), $this->precision );
 	}
 }
