@@ -499,6 +499,30 @@ class MySQL {
 		}
 	}
 	
+	public function bulkInsert( $table, array $dataSet )
+	{
+		if ( ! $this->isNumericArray( $dataSet ) )
+		{
+			throw new \InvalidArgumentException( 'Array must be a numerically indexed array of associative arrays.' );
+		}
+		
+		$escapedFields = $this->buildInserts( $dataSet[0] )['keys'];
+		
+		$escapedDataList = implode( ',',
+			array_map(
+				function ( $data )
+				{
+					return '(' . $this->buildInserts( $data )['values'] . ')';
+				}
+				, $dataSet
+			)
+		);
+		
+		$this->query( "INSERT INTO `{$table}` ({$escapedFields}) VALUES {$escapedDataList};" );
+		
+		return $this->getResult();
+	}
+	
 	/**
 	 * Update records by passing the table,
 	 * an associative array of fields => values to update,
@@ -1048,6 +1072,16 @@ class MySQL {
 	public function isAssoc( array $array )
 	{
 		return array_keys( $array ) !== range( 0, count( $array ) - 1 );
+	}
+	
+	/**
+	 * @param array $array
+	 *
+	 * @return bool
+	 */
+	public function isNumericArray( array $array )
+	{
+		return array_keys( $array ) === range( 0, count( $array ) - 1 );
 	}
 	
 	/**
