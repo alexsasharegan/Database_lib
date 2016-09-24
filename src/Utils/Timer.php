@@ -58,7 +58,7 @@ class Timer {
 	public function stop()
 	{
 		$this->end = $this->now();
-		$this->setTime( $this->calcTime( $this->now(), $this->start ) );
+		$this->setTime( $this->calcTime( $this->end, $this->start ) );
 		
 		return $this->time;
 	}
@@ -81,6 +81,11 @@ class Timer {
 	public function getCurrentTime()
 	{
 		return $this->calcTime( $this->now(), $this->start );
+	}
+	
+	public function lap()
+	{
+		return $this->getCurrentTime();
 	}
 	
 	/**
