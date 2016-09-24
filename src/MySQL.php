@@ -499,6 +499,15 @@ class MySQL {
 		}
 	}
 	
+	/**
+	 * Insert an array of models (associative arrays) into the given table in one query.
+	 * Returns true on success.
+	 *
+	 * @param       $table
+	 * @param array $dataSet
+	 *
+	 * @return \mysqli_result|null
+	 */
 	public function bulkInsert( $table, array $dataSet )
 	{
 		if ( ! $this->isNumericArray( $dataSet ) )
