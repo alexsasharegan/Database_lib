@@ -4,7 +4,7 @@
 [![Latest Unstable Version](https://poser.pugx.org/alexsasharegan/database/v/unstable)](https://packagist.org/packages/alexsasharegan/database)
 [![License](https://poser.pugx.org/alexsasharegan/database/license)](https://packagist.org/packages/alexsasharegan/database)
 
-### PHP Mysqli utilities to properly handle errors, connections, and make getting data simple and DRY.
+PHP Mysqli utilities to properly handle errors, connections, and make getting data simple and DRY.
 
 - - - -
 
