@@ -1,4 +1,8 @@
 # Database
+[![Latest Stable Version](https://poser.pugx.org/alexsasharegan/database/v/stable)](https://packagist.org/packages/alexsasharegan/database)
+[![Total Downloads](https://poser.pugx.org/alexsasharegan/database/downloads)](https://packagist.org/packages/alexsasharegan/database)
+[![Latest Unstable Version](https://poser.pugx.org/alexsasharegan/database/v/unstable)](https://packagist.org/packages/alexsasharegan/database)
+[![License](https://poser.pugx.org/alexsasharegan/database/license)](https://packagist.org/packages/alexsasharegan/database)
 
 ### PHP Mysqli utilities to properly handle errors, connections, and make getting data simple and DRY.
 
