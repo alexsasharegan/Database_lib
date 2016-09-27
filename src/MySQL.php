@@ -402,7 +402,7 @@ class MySQL {
 		
 		if ( is_integer( $where ) )
 		{
-			$WHERE = "WHERE `id`={$where}";
+			$WHERE = "WHERE `id`={$where} LIMIT 1";
 		}
 		elseif ( is_array( $where ) )
 		{
@@ -555,7 +555,7 @@ class MySQL {
 		
 		if ( is_integer( $where ) )
 		{
-			$WHERE = "WHERE `id`={$where}";
+			$WHERE = "WHERE `id`={$where} LIMIT 1";
 		}
 		elseif ( is_array( $where ) )
 		{
@@ -590,7 +590,7 @@ class MySQL {
 	{
 		if ( is_integer( $where ) )
 		{
-			$WHERE = "WHERE `id`={$where}";
+			$WHERE = "WHERE `id`={$where} LIMIT 1";
 		}
 		elseif ( is_array( $where ) )
 		{
