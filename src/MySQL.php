@@ -1053,6 +1053,10 @@ class MySQL {
 					$values[] = $val ? 1 : 0;
 					break;
 				case 'NULL': # NULL
+					$safeKey = $this->escape( trim( $key ) );
+					$keys[]  = "`$safeKey`";
+					
+					$values[] = 'NULL';
 				case 'double': # doubles
 				case 'integer': # & integers don't need escaping or quotations
 					$safeKey = $this->escape( trim( $key ) );
