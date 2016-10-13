@@ -1057,6 +1057,7 @@ class MySQL {
 					$keys[]  = "`$safeKey`";
 					
 					$values[] = 'NULL';
+					break;
 				case 'double': # doubles
 				case 'integer': # & integers don't need escaping or quotations
 					$safeKey = $this->escape( trim( $key ) );
