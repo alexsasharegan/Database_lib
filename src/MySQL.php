@@ -74,6 +74,7 @@ class MySQL {
 	 * @param array  $options
 	 *
 	 * @return \mysqli
+	 * @throws \Exception
 	 */
 	public static function connect( $configFile = './database.json', array $options = [] )
 	{
@@ -104,15 +105,14 @@ class MySQL {
 		
 		$mysqli = new \mysqli( $host, $username, $password, $database );
 		
-		# Check for errors
-		if ( mysqli_connect_errno() )
+		if ( $errorCode = mysqli_connect_errno() )
 		{
-			exit(mysqli_connect_error());
+			throw new \Exception( mysqli_connect_error() . "\nError Code: {$errorCode}" );
 		}
 		
 		if ( ! $mysqli->set_charset( 'utf8' ) )
 		{
-			exit("Error setting character set = utf-8 for database $database: %s\n" . $mysqli->error);
+			throw new \Exception( "Error setting character set = utf-8 for database: $database.\n{$mysqli->error}" );
 		}
 		
 		return $mysqli;
@@ -122,10 +122,12 @@ class MySQL {
 	 * @param string $SQLDate
 	 * @param string $timezone
 	 *
-	 * @return string
+	 * @return string|null
 	 */
 	public static function SQLDateToPath( $SQLDate, $timezone = "America/Phoenix" )
 	{
+		if ( empty($SQLDate) ) return NULL;
+		
 		date_default_timezone_set( $timezone );
 		$timeStamp = strtotime( $SQLDate );
 		
@@ -265,6 +267,8 @@ class MySQL {
 	 *
 	 * @param string $configFile
 	 * @param array  $options
+	 *
+	 * @throws \Exception
 	 */
 	function __construct( $configFile = './database.json', array $options = [] )
 	{
@@ -295,14 +299,15 @@ class MySQL {
 		
 		$mysqli = new \mysqli( $this->_host, $this->_username, $this->_password, $this->_database );
 		
-		# Check for errors
-		if ( mysqli_connect_errno() )
+		
+		if ( $errorCode = mysqli_connect_errno() )
 		{
-			exit(mysqli_connect_error());
+			throw new \Exception( mysqli_connect_error() . "\nError Code: {$errorCode}" );
 		}
+		
 		if ( ! $mysqli->set_charset( 'utf8' ) )
 		{
-			exit("Error loading character set utf8 for db {$this->_database}: %s\n" . $mysqli->error);
+			throw new \Exception( "Error setting character set = utf-8 for database: {$this->_database}.\n{$mysqli->error}" );
 		}
 		
 		$this->db = $mysqli;
