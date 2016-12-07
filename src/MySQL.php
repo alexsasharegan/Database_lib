@@ -16,6 +16,8 @@ class MySQL {
 	 */
 	const CONFIG = './database.json';
 	
+	const TIME_FORMAT = 'Y-m-d H:i:s';
+	
 	/**
 	 * @var \mysqli|null
 	 */
@@ -79,14 +81,14 @@ class MySQL {
 	public static function connect( $configFile = './database.json', array $options = [] )
 	{
 		
-		if ( empty($configFile) )
+		if ( empty( $configFile ) )
 		{
 			$host     = $options['host'];
 			$database = $options['database'];
 			$username = $options['username'];
 			$password = $options['password'];
 		}
-		elseif ( ! empty($configFile) && empty($options) )
+		elseif ( ! empty( $configFile ) && empty( $options ) )
 		{
 			$config   = json_decode( file_get_contents( $configFile ) );
 			$host     = $config->host;
@@ -94,13 +96,13 @@ class MySQL {
 			$username = $config->username;
 			$password = $config->password;
 		}
-		elseif ( ! empty($configFile) && ! empty($options) )
+		elseif ( ! empty( $configFile ) && ! empty( $options ) )
 		{
 			$config   = json_decode( file_get_contents( $configFile ) );
-			$host     = ! empty($options['host']) ? $options['host'] : $config->host;
-			$database = ! empty($options['database']) ? $options['database'] : $config->database;
-			$username = ! empty($options['username']) ? $options['username'] : $config->username;
-			$password = ! empty($options['password']) ? $options['password'] : $config->password;
+			$host     = ! empty( $options['host'] ) ? $options['host'] : $config->host;
+			$database = ! empty( $options['database'] ) ? $options['database'] : $config->database;
+			$username = ! empty( $options['username'] ) ? $options['username'] : $config->username;
+			$password = ! empty( $options['password'] ) ? $options['password'] : $config->password;
 		}
 		
 		$mysqli = new \mysqli( $host, $username, $password, $database );
@@ -126,7 +128,7 @@ class MySQL {
 	 */
 	public static function SQLDateToPath( $SQLDate, $timezone = "America/Phoenix" )
 	{
-		if ( empty($SQLDate) ) return NULL;
+		if ( empty( $SQLDate ) ) return NULL;
 		
 		date_default_timezone_set( $timezone );
 		$timeStamp = strtotime( $SQLDate );
@@ -149,7 +151,7 @@ class MySQL {
 	{
 		date_default_timezone_set( $timezone );
 		
-		return date( 'Y-m-d H:i:s' );
+		return date( self::TIME_FORMAT );
 	}
 	
 	/**
@@ -273,14 +275,14 @@ class MySQL {
 	function __construct( $configFile = './database.json', array $options = [] )
 	{
 		
-		if ( empty($configFile) )
+		if ( empty( $configFile ) )
 		{
 			$this->_host     = $options['host'];
 			$this->_database = $options['database'];
 			$this->_username = $options['username'];
 			$this->_password = $options['password'];
 		}
-		elseif ( ! empty($configFile) && empty($options) )
+		elseif ( ! empty( $configFile ) && empty( $options ) )
 		{
 			$config          = json_decode( file_get_contents( $configFile ) );
 			$this->_host     = $config->host;
@@ -288,13 +290,13 @@ class MySQL {
 			$this->_username = $config->username;
 			$this->_password = $config->password;
 		}
-		elseif ( ! empty($configFile) && ! empty($options) )
+		elseif ( ! empty( $configFile ) && ! empty( $options ) )
 		{
 			$config          = json_decode( file_get_contents( $configFile ) );
-			$this->_host     = ! empty($options['host']) ? $options['host'] : $config->host;
-			$this->_database = ! empty($options['database']) ? $options['database'] : $config->database;
-			$this->_username = ! empty($options['username']) ? $options['username'] : $config->username;
-			$this->_password = ! empty($options['password']) ? $options['password'] : $config->password;
+			$this->_host     = ! empty( $options['host'] ) ? $options['host'] : $config->host;
+			$this->_database = ! empty( $options['database'] ) ? $options['database'] : $config->database;
+			$this->_username = ! empty( $options['username'] ) ? $options['username'] : $config->username;
+			$this->_password = ! empty( $options['password'] ) ? $options['password'] : $config->password;
 		}
 		
 		$mysqli = new \mysqli( $this->_host, $this->_username, $this->_password, $this->_database );
@@ -437,7 +439,7 @@ class MySQL {
 	 */
 	public function insert( $table, array $insertPairs, $update = FALSE )
 	{
-		if ( empty($insertPairs) )
+		if ( empty( $insertPairs ) )
 		{
 			return FALSE;
 		}
@@ -482,7 +484,7 @@ class MySQL {
 	 */
 	public function insertOnUpdate( $table, array $insertPairs, array $updatePairs )
 	{
-		if ( empty($insertPairs) || empty($updatePairs) )
+		if ( empty( $insertPairs ) || empty( $updatePairs ) )
 		{
 			throw new \InvalidArgumentException( "Insert data cannot be empty." );
 		}
@@ -671,7 +673,7 @@ class MySQL {
 	 */
 	public function getLastQuery()
 	{
-		if ( isset($this->_query) )
+		if ( isset( $this->_query ) )
 		{
 			return $this->_query;
 		}
@@ -749,7 +751,7 @@ class MySQL {
 	 */
 	public function getResult()
 	{
-		if ( isset($this->queryResult) )
+		if ( isset( $this->queryResult ) )
 		{
 			return $this->queryResult;
 		}
@@ -775,7 +777,7 @@ class MySQL {
 	 */
 	public function numRows()
 	{
-		if ( isset($this->queryResult) )
+		if ( isset( $this->queryResult ) )
 		{
 			return $this->queryResult->num_rows;
 		}
@@ -908,7 +910,7 @@ class MySQL {
 	 */
 	public function getColumns( $table, $database = '' )
 	{
-		if ( empty($database) )
+		if ( empty( $database ) )
 		{
 			$database = $this->_database;
 		}
