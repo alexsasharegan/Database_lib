@@ -16,25 +16,21 @@ namespace Database\Where;
 class Clause {
 	
 	/**
+	 * @var array
+	 */
+	private static $_typeList = [ 'AND', 'OR', 'NOT', ];
+	/**
 	 * @var \mysqli
 	 */
 	private $_db;
-	
 	/**
 	 * @var array
 	 */
 	private $_data = [];
-	
 	/**
 	 * @var string
 	 */
 	private $_type = 'AND';
-	
-	/**
-	 * @var array
-	 */
-	private static $_typeList = [ 'AND', 'OR', 'NOT', ];
-	
 	/**
 	 * @var string
 	 */
@@ -77,16 +73,6 @@ class Clause {
 	];
 	
 	/**
-	 * @param $type
-	 *
-	 * @return bool
-	 */
-	public static function isValidType( $type )
-	{
-		return in_array( strtoupper( trim( $type ) ), self::$_typeList );
-	}
-	
-	/**
 	 * Clause constructor.
 	 *
 	 * @param \mysqli $mysqli
@@ -100,6 +86,16 @@ class Clause {
 		{
 			$this->_type = $type;
 		}
+	}
+	
+	/**
+	 * @param $type
+	 *
+	 * @return bool
+	 */
+	public static function isValidType( $type )
+	{
+		return in_array( strtoupper( trim( $type ) ), self::$_typeList );
 	}
 	
 	/**
@@ -129,20 +125,6 @@ class Clause {
 	}
 	
 	/**
-	 * @param $field
-	 * @param $value
-	 *
-	 * @return $this
-	 */
-	public function add( $field, $value )
-	{
-		$parsedField   = $this->parseField( $field );
-		$this->_data[] = array_merge( $parsedField, [ 'value' => $this->escapeValue( $value ), ] );
-		
-		return $this;
-	}
-	
-	/**
 	 * @param array $dataList
 	 *
 	 * @return $this
@@ -153,6 +135,20 @@ class Clause {
 		{
 			$this->add( $field, $value );
 		}
+		
+		return $this;
+	}
+	
+	/**
+	 * @param $field
+	 * @param $value
+	 *
+	 * @return $this
+	 */
+	public function add( $field, $value )
+	{
+		$parsedField   = $this->parseField( $field );
+		$this->_data[] = array_merge( $parsedField, [ 'value' => $this->escapeValue( $value ), ] );
 		
 		return $this;
 	}

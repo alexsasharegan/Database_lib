@@ -17,7 +17,18 @@ class MySQL {
 	const CONFIG = './database.json';
 	
 	const TIME_FORMAT = 'Y-m-d H:i:s';
-	
+	/**
+	 * @var string
+	 */
+	public static $lc_alpha = 'abcdefghijklmnopqrstuvwxyz';
+	/**
+	 * @var string
+	 */
+	public static $numeric = '0123456789';
+	/**
+	 * @var string
+	 */
+	public static $hex = '0123456789abcdef';
 	/**
 	 * @var \mysqli|null
 	 */
@@ -34,7 +45,6 @@ class MySQL {
 	 * @var array
 	 */
 	public $columns = [];
-	
 	/**
 	 * @var string
 	 */
@@ -51,7 +61,6 @@ class MySQL {
 	 * @var string
 	 */
 	private $_password;
-	
 	/**
 	 * @var string
 	 */
@@ -60,207 +69,14 @@ class MySQL {
 	 * @var array
 	 */
 	private $_logs = [];
-	
 	/**
 	 * @var array
 	 */
 	private $createdTables = [];
-	
 	/**
 	 * @var array
 	 */
 	private $_ids = [];
-	
-	/**
-	 * @param string $configFile
-	 * @param array  $options
-	 *
-	 * @return \mysqli
-	 * @throws \Exception
-	 */
-	public static function connect( $configFile = './database.json', array $options = [] )
-	{
-		
-		if ( empty( $configFile ) )
-		{
-			$host     = $options['host'];
-			$database = $options['database'];
-			$username = $options['username'];
-			$password = $options['password'];
-		}
-		elseif ( ! empty( $configFile ) && empty( $options ) )
-		{
-			$config   = json_decode( file_get_contents( $configFile ) );
-			$host     = $config->host;
-			$database = $config->database;
-			$username = $config->username;
-			$password = $config->password;
-		}
-		elseif ( ! empty( $configFile ) && ! empty( $options ) )
-		{
-			$config   = json_decode( file_get_contents( $configFile ) );
-			$host     = ! empty( $options['host'] ) ? $options['host'] : $config->host;
-			$database = ! empty( $options['database'] ) ? $options['database'] : $config->database;
-			$username = ! empty( $options['username'] ) ? $options['username'] : $config->username;
-			$password = ! empty( $options['password'] ) ? $options['password'] : $config->password;
-		}
-		
-		$mysqli = new \mysqli( $host, $username, $password, $database );
-		
-		if ( $errorCode = mysqli_connect_errno() )
-		{
-			throw new \Exception( mysqli_connect_error() . "\nError Code: {$errorCode}" );
-		}
-		
-		if ( ! $mysqli->set_charset( 'utf8' ) )
-		{
-			throw new \Exception( "Error setting character set = utf-8 for database: $database.\n{$mysqli->error}" );
-		}
-		
-		return $mysqli;
-	}
-	
-	/**
-	 * @param string $SQLDate
-	 * @param string $timezone
-	 *
-	 * @return string|null
-	 */
-	public static function SQLDateToPath( $SQLDate, $timezone = "America/Phoenix" )
-	{
-		if ( empty( $SQLDate ) ) return NULL;
-		
-		date_default_timezone_set( $timezone );
-		$timeStamp = strtotime( $SQLDate );
-		
-		return implode( DIRECTORY_SEPARATOR, [
-			date( 'Y', $timeStamp ),
-			date( 'm', $timeStamp ),
-			date( 'd', $timeStamp ),
-		] );
-	}
-	
-	/**
-	 * Get the current time formatted for MySQL
-	 *
-	 * @param string $timezone
-	 *
-	 * @return false|string
-	 */
-	public static function getSQLDate( $timezone = "America/Phoenix" )
-	{
-		date_default_timezone_set( $timezone );
-		
-		return date( self::TIME_FORMAT );
-	}
-	
-	/**
-	 * Get the current time formatted for MySQL
-	 *
-	 * @param string $timezone
-	 *
-	 * @return false|string
-	 */
-	public static function now( $timezone = "America/Phoenix" )
-	{
-		return self::getSQLDate( $timezone );
-	}
-	
-	/**
-	 * @var string
-	 */
-	public static $lc_alpha = 'abcdefghijklmnopqrstuvwxyz';
-	
-	/**
-	 * @var string
-	 */
-	public static $numeric = '0123456789';
-	
-	/**
-	 * @var string
-	 */
-	public static $hex = '0123456789abcdef';
-	
-	/**
-	 * Generate a variable-length random string of alpha characters. Defaults to lower case.
-	 *
-	 * Set $caseSensitive = TRUE to return both upper & lower case alpha characters.
-	 *
-	 * @param      $length
-	 * @param bool $caseSensitive
-	 *
-	 * @return string
-	 */
-	public static function randomString( $length, $caseSensitive = FALSE )
-	{
-		if ( $caseSensitive )
-		{
-			$characters = self::$lc_alpha . strtoupper( self::$lc_alpha );
-		}
-		else
-		{
-			$characters = self::$lc_alpha;
-		}
-		
-		return self::_randomString( $characters, $length );
-	}
-	
-	/**
-	 * Generate a variable-length random string of alpha-numeric characters. Defaults to lower case.
-	 *
-	 * Set $caseSensitive = TRUE to return both upper & lower case alpha-numeric characters.
-	 *
-	 * @param      $length
-	 * @param bool $caseSensitive
-	 *
-	 * @return string
-	 */
-	public static function randomAlphaNumeric( $length, $caseSensitive = FALSE )
-	{
-		if ( $caseSensitive )
-		{
-			$characters = self::$numeric . self::$lc_alpha . strtoupper( self::$lc_alpha );
-		}
-		else
-		{
-			$characters = self::$numeric . self::$lc_alpha;
-		}
-		
-		return self::_randomString( $characters, $length );
-	}
-	
-	/**
-	 * Generate a variable-length random string of hexidecimal characters. Defaults to lower case.
-	 *
-	 * @param      $length
-	 *
-	 * @return string
-	 */
-	public static function randomHex( $length )
-	{
-		$characters = self::$hex;
-		
-		return self::_randomString( $characters, $length );
-	}
-	
-	/**
-	 * @param $characterSet
-	 * @param $length
-	 *
-	 * @return string
-	 */
-	private static function _randomString( $characterSet, $length )
-	{
-		$charLastIndex = (strlen( $characterSet ) - 1);
-		$string        = '';
-		
-		for ( $i = 0; $i < $length; $i++ )
-		{
-			$string .= $characterSet[ mt_rand( 0, $charLastIndex ) ];
-		}
-		
-		return $string;
-	}
 	
 	/**
 	 * MySQL constructor. Pass in the path to a json config file.
@@ -316,6 +132,133 @@ class MySQL {
 	}
 	
 	/**
+	 * @param string $SQLDate
+	 * @param string $timezone
+	 *
+	 * @return string|null
+	 */
+	public static function SQLDateToPath( $SQLDate, $timezone = "America/Phoenix" )
+	{
+		if ( empty( $SQLDate ) ) return NULL;
+		
+		date_default_timezone_set( $timezone );
+		$timeStamp = strtotime( $SQLDate );
+		
+		return implode( DIRECTORY_SEPARATOR, [
+			date( 'Y', $timeStamp ),
+			date( 'm', $timeStamp ),
+			date( 'd', $timeStamp ),
+		] );
+	}
+	
+	/**
+	 * Get the current time formatted for MySQL
+	 *
+	 * @param string $timezone
+	 *
+	 * @return false|string
+	 */
+	public static function now( $timezone = "America/Phoenix" )
+	{
+		return self::getSQLDate( $timezone );
+	}
+	
+	/**
+	 * Get the current time formatted for MySQL
+	 *
+	 * @param string $timezone
+	 *
+	 * @return false|string
+	 */
+	public static function getSQLDate( $timezone = "America/Phoenix" )
+	{
+		date_default_timezone_set( $timezone );
+		
+		return date( self::TIME_FORMAT );
+	}
+	
+	/**
+	 * Generate a variable-length random string of alpha characters. Defaults to lower case.
+	 *
+	 * Set $caseSensitive = TRUE to return both upper & lower case alpha characters.
+	 *
+	 * @param      $length
+	 * @param bool $caseSensitive
+	 *
+	 * @return string
+	 */
+	public static function randomString( $length, $caseSensitive = FALSE )
+	{
+		if ( $caseSensitive )
+		{
+			$characters = self::$lc_alpha . strtoupper( self::$lc_alpha );
+		}
+		else
+		{
+			$characters = self::$lc_alpha;
+		}
+		
+		return self::_randomString( $characters, $length );
+	}
+	
+	/**
+	 * @param $characterSet
+	 * @param $length
+	 *
+	 * @return string
+	 */
+	private static function _randomString( $characterSet, $length )
+	{
+		$charLastIndex = (strlen( $characterSet ) - 1);
+		$string        = '';
+		
+		for ( $i = 0; $i < $length; $i++ )
+		{
+			$string .= $characterSet[ mt_rand( 0, $charLastIndex ) ];
+		}
+		
+		return $string;
+	}
+	
+	/**
+	 * Generate a variable-length random string of alpha-numeric characters. Defaults to lower case.
+	 *
+	 * Set $caseSensitive = TRUE to return both upper & lower case alpha-numeric characters.
+	 *
+	 * @param      $length
+	 * @param bool $caseSensitive
+	 *
+	 * @return string
+	 */
+	public static function randomAlphaNumeric( $length, $caseSensitive = FALSE )
+	{
+		if ( $caseSensitive )
+		{
+			$characters = self::$numeric . self::$lc_alpha . strtoupper( self::$lc_alpha );
+		}
+		else
+		{
+			$characters = self::$numeric . self::$lc_alpha;
+		}
+		
+		return self::_randomString( $characters, $length );
+	}
+	
+	/**
+	 * Generate a variable-length random string of hexidecimal characters. Defaults to lower case.
+	 *
+	 * @param      $length
+	 *
+	 * @return string
+	 */
+	public static function randomHex( $length )
+	{
+		$characters = self::$hex;
+		
+		return self::_randomString( $characters, $length );
+	}
+	
+	/**
 	 * Switch a database by passing the database name.
 	 * Automatically closes the previous connection.
 	 * (uses current connection settings)
@@ -343,6 +286,55 @@ class MySQL {
 	}
 	
 	/**
+	 * @param string $configFile
+	 * @param array  $options
+	 *
+	 * @return \mysqli
+	 * @throws \Exception
+	 */
+	public static function connect( $configFile = './database.json', array $options = [] )
+	{
+		
+		if ( empty( $configFile ) )
+		{
+			$host     = $options['host'];
+			$database = $options['database'];
+			$username = $options['username'];
+			$password = $options['password'];
+		}
+		elseif ( ! empty( $configFile ) && empty( $options ) )
+		{
+			$config   = json_decode( file_get_contents( $configFile ) );
+			$host     = $config->host;
+			$database = $config->database;
+			$username = $config->username;
+			$password = $config->password;
+		}
+		elseif ( ! empty( $configFile ) && ! empty( $options ) )
+		{
+			$config   = json_decode( file_get_contents( $configFile ) );
+			$host     = ! empty( $options['host'] ) ? $options['host'] : $config->host;
+			$database = ! empty( $options['database'] ) ? $options['database'] : $config->database;
+			$username = ! empty( $options['username'] ) ? $options['username'] : $config->username;
+			$password = ! empty( $options['password'] ) ? $options['password'] : $config->password;
+		}
+		
+		$mysqli = new \mysqli( $host, $username, $password, $database );
+		
+		if ( $errorCode = mysqli_connect_errno() )
+		{
+			throw new \Exception( mysqli_connect_error() . "\nError Code: {$errorCode}" );
+		}
+		
+		if ( ! $mysqli->set_charset( 'utf8' ) )
+		{
+			throw new \Exception( "Error setting character set = utf-8 for database: $database.\n{$mysqli->error}" );
+		}
+		
+		return $mysqli;
+	}
+	
+	/**
 	 * Automatically closes the connection to mysql
 	 */
 	function __destruct()
@@ -351,33 +343,6 @@ class MySQL {
 		{
 			$this->db->close();
 		}
-	}
-	
-	/**
-	 * Perform a raw SQL query. Does not return the result object,
-	 * but instead returns the MySQL instance for chaining.
-	 *
-	 * @see MySQL::getResult() for getting the raw result object.
-	 *
-	 * @param string $query
-	 *
-	 * @return MySQL $this
-	 * @throws BadQuery
-	 */
-	public function query( $query )
-	{
-		$this->setQuery( $query );
-		
-		$time = new Timer();
-		
-		if ( ! $this->queryResult = $this->db->query( $this->_query ) )
-		{
-			throw new BadQuery( $this->_query, $this->db->error, $this->getLogs() );
-		}
-		
-		$this->_logs[] = [ 'query' => array_pop( $this->_logs ), 'time' => $time->stop(), ];
-		
-		return $this;
 	}
 	
 	/**
@@ -426,6 +391,115 @@ class MySQL {
 	}
 	
 	/**
+	 * Wraps an array of columns in backticks
+	 * and returns the escaped array
+	 *
+	 * @param array $colList
+	 *
+	 * @return array
+	 */
+	public function escapeColumnNames( array $colList )
+	{
+		$escapedList = [];
+		foreach ( $colList as $col )
+		{
+			$escapedList[] = $this->escapeColumnName( $col );
+		}
+		
+		return $escapedList;
+	}
+	
+	/**
+	 * Wraps a column name in backticks
+	 *
+	 * @param $columnName
+	 *
+	 * @return string
+	 */
+	public function escapeColumnName( $columnName )
+	{
+		if ( $columnName === '*' )
+		{
+			return $columnName;
+		}
+		
+		return '`' . $this->escape( $columnName ) . '`';
+	}
+	
+	/**
+	 * Escapes a value
+	 *
+	 * @param $string
+	 *
+	 * @return string
+	 */
+	public function escape( $string )
+	{
+		settype( $string, 'string' );
+		
+		return $this->db->real_escape_string( $string );
+	}
+	
+	/**
+	 * @param $whereData
+	 *
+	 * @return Where
+	 */
+	protected function getWhereClause( $whereData )
+	{
+		$where = new Where( $this->db );
+		$where->parseClause( $whereData );
+		
+		return $where;
+	}
+	
+	/**
+	 * Perform a raw SQL query. Does not return the result object,
+	 * but instead returns the MySQL instance for chaining.
+	 *
+	 * @see MySQL::getResult() for getting the raw result object.
+	 *
+	 * @param string $query
+	 *
+	 * @return MySQL $this
+	 * @throws BadQuery
+	 */
+	public function query( $query )
+	{
+		$this->setQuery( $query );
+		
+		$time = new Timer();
+		
+		if ( ! $this->queryResult = $this->db->query( $this->_query ) )
+		{
+			throw new BadQuery( $this->_query, $this->db->error, $this->getLogs() );
+		}
+		
+		$this->_logs[] = [ 'query' => array_pop( $this->_logs ), 'time' => $time->stop(), ];
+		
+		return $this;
+	}
+	
+	/**
+	 * @param string $query
+	 */
+	protected function setQuery( $query )
+	{
+		$this->_query  = $query;
+		$this->_logs[] = $query;
+	}
+	
+	/**
+	 * Gets an array of all the queries performed by the instance
+	 *
+	 * @return array
+	 */
+	public function getLogs()
+	{
+		return $this->_logs;
+	}
+	
+	/**
 	 * Insert a single row by passing the table,
 	 * an associative array of fields => values to insert,
 	 * and [optional] a boolean whether or not to update on duplicate with the same data set
@@ -466,6 +540,154 @@ class MySQL {
 		{
 			return FALSE;
 		}
+	}
+	
+	/**
+	 * Escapes an associative array of [ keys => values ]
+	 * and returns an array with the escaped data
+	 * at $returnArray['keys'] & $returnArray['values']
+	 *
+	 * @param array $insertList
+	 *
+	 * @return array
+	 */
+	public function buildInserts( array $insertList )
+	{
+		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $insertList );
+		
+		return [
+			'keys'   => implode( ',', $escapedKeyValuePairs['keys'] ),
+			'values' => implode( ',', $escapedKeyValuePairs['values'] ),
+		];
+	}
+	
+	/**
+	 * @param array $assoc_array
+	 *
+	 * @return array
+	 */
+	public function escapeKeyValuePairs( array $assoc_array )
+	{
+		$keys   = [];
+		$values = [];
+		
+		foreach ( $assoc_array as $key => $val )
+		{
+			switch ( gettype( $val ) )
+			{
+				case 'object': # handle objects
+				case 'array': # and arrays the same
+					$safeKey = $this->escape( trim( $key ) );
+					$keys[]  = ("`$safeKey`");
+					
+					$jsonStrValue = json_encode( $val );
+					$safeValue    = $this->escape( $jsonStrValue );
+					$values[]     = "'$safeValue'";
+					break;
+				case 'string': # escape key & value and wrap in quotes
+					$safeKey = $this->escape( trim( $key ) );
+					$keys[]  = ("`$safeKey`");
+					
+					$safeValue = $this->escape( $val );
+					$values[]  = "'$safeValue'";
+					break;
+				case 'boolean': # booleans
+					$safeKey = $this->escape( trim( $key ) );
+					$keys[]  = "`$safeKey`";
+					
+					$values[] = $val ? 1 : 0;
+					break;
+				case 'NULL': # NULL
+					$safeKey = $this->escape( trim( $key ) );
+					$keys[]  = "`$safeKey`";
+					
+					$values[] = 'NULL';
+					break;
+				case 'double': # doubles
+				case 'integer': # & integers don't need escaping or quotations
+					$safeKey = $this->escape( trim( $key ) );
+					$keys[]  = "`$safeKey`";
+					
+					$values[] = $val;
+					break;
+				default: # if the value doesn't match these types,
+					break; # skip inclusion
+			}
+		}
+		
+		return [
+			'keys'   => $keys,
+			'values' => $values,
+		];
+	}
+	
+	/**
+	 * Escapes an associative array of [ keys => values ]
+	 * and returns an Update Statement string with the escaped data
+	 *
+	 * @param array $data
+	 *
+	 * @return string
+	 */
+	public function buildUpdate( array $data )
+	{
+		$updateList           = [];
+		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $data );
+		$length               = count( $escapedKeyValuePairs['keys'] );
+		
+		for ( $i = 0; $i < $length; $i++ )
+		{
+			$updateList[] = "{$escapedKeyValuePairs['keys'][$i]}={$escapedKeyValuePairs['values'][$i]}";
+		}
+		
+		return implode( ', ', $updateList );
+	}
+	
+	/**
+	 * Returns the last query's result object
+	 *
+	 * @return null|\mysqli_result
+	 */
+	public function getResult()
+	{
+		if ( isset( $this->queryResult ) )
+		{
+			return $this->queryResult;
+		}
+		
+		return NULL;
+	}
+	
+	/**
+	 * @param $id
+	 *
+	 * @return int
+	 */
+	private function pushId( $id )
+	{
+		if ( $id > 0 )
+		{
+			$this->_ids[] = $id;
+		}
+		
+		return count( $this->_ids );
+	}
+	
+	/**
+	 * Returns the last inserted id from mysqli
+	 *
+	 * @return null|integer
+	 */
+	public function insertId()
+	{
+		$id = $this->db->insert_id;
+		
+		if ( $id > 0 )
+		{
+			return $id;
+		}
+		
+		return NULL;
 	}
 	
 	/**
@@ -540,6 +762,16 @@ class MySQL {
 	}
 	
 	/**
+	 * @param array $array
+	 *
+	 * @return bool
+	 */
+	public function isNumericArray( array $array )
+	{
+		return array_keys( $array ) === range( 0, count( $array ) - 1 );
+	}
+	
+	/**
 	 * Update records by passing the table,
 	 * an associative array of fields => values to update,
 	 * and [optional] a where clause
@@ -576,6 +808,17 @@ class MySQL {
 		$this->query( "UPDATE `{$table}` SET {$escapedData} {$WHERE}" );
 		
 		return $this->affectedRows();
+	}
+	
+	/**
+	 * Returns the number of rows affected by the last query
+	 * (inserts, updates, deletes)
+	 *
+	 * @return null|integer
+	 */
+	public function affectedRows()
+	{
+		return $this->db->affected_rows;
 	}
 	
 	/**
@@ -643,69 +886,6 @@ class MySQL {
 	}
 	
 	/**
-	 * Drop a table
-	 *
-	 * @param $table
-	 *
-	 * @return \mysqli_result|null
-	 */
-	public function dropTable( $table )
-	{
-		$statement = "DROP TABLE {$table}";
-		$this->query( $statement );
-		
-		return $this->getResult();
-	}
-	
-	/**
-	 * @param string $query
-	 */
-	protected function setQuery( $query )
-	{
-		$this->_query  = $query;
-		$this->_logs[] = $query;
-	}
-	
-	/**
-	 * Returns the last query executed
-	 *
-	 * @return null|string
-	 */
-	public function getLastQuery()
-	{
-		if ( isset( $this->_query ) )
-		{
-			return $this->_query;
-		}
-		
-		return NULL;
-	}
-	
-	/**
-	 * Takes an iterator (closure) to process each row of returned data.
-	 *
-	 * @param callable $cb
-	 *
-	 * @return MySQL $this
-	 */
-	public function iterateResult( callable $cb )
-	{
-		$args = array_slice( func_get_args(), 1 );
-		
-		if ( is_callable( $cb ) )
-		{
-			while ( $record = $this->queryResult->fetch_assoc() )
-			{
-				$params = array_merge( [ $record ], $args );
-				
-				call_user_func_array( $cb, $params );
-			}
-		}
-		
-		return $this;
-	}
-	
-	/**
 	 * Applies a function against an accumulator ($carry) and each row of the last returned mysqli result object to
 	 * reduce it to a single value.
 	 *
@@ -745,31 +925,6 @@ class MySQL {
 	}
 	
 	/**
-	 * Returns the last query's result object
-	 *
-	 * @return null|\mysqli_result
-	 */
-	public function getResult()
-	{
-		if ( isset( $this->queryResult ) )
-		{
-			return $this->queryResult;
-		}
-		
-		return NULL;
-	}
-	
-	/**
-	 * Get the last error from mysqli
-	 *
-	 * @return string
-	 */
-	public function getError()
-	{
-		return $this->db->error;
-	}
-	
-	/**
 	 * Returns the number of rows from the last query
 	 * (must be done before iterating over the result)
 	 *
@@ -780,34 +935,6 @@ class MySQL {
 		if ( isset( $this->queryResult ) )
 		{
 			return $this->queryResult->num_rows;
-		}
-		
-		return NULL;
-	}
-	
-	/**
-	 * Returns the number of rows affected by the last query
-	 * (inserts, updates, deletes)
-	 *
-	 * @return null|integer
-	 */
-	public function affectedRows()
-	{
-		return $this->db->affected_rows;
-	}
-	
-	/**
-	 * Returns the last inserted id from mysqli
-	 *
-	 * @return null|integer
-	 */
-	public function insertId()
-	{
-		$id = $this->db->insert_id;
-		
-		if ( $id > 0 )
-		{
-			return $id;
 		}
 		
 		return NULL;
@@ -840,17 +967,6 @@ class MySQL {
 	}
 	
 	/**
-	 * Inserts performed using the insert methods
-	 * save the inserted ids to an array.
-	 *
-	 * @return array
-	 */
-	public function getInsertedIds()
-	{
-		return $this->_ids;
-	}
-	
-	/**
 	 * ALias for getInsertedIds
 	 *
 	 * @see MySQL::getInsertedIds()
@@ -863,41 +979,14 @@ class MySQL {
 	}
 	
 	/**
-	 * @param $id
-	 *
-	 * @return int
-	 */
-	private function pushId( $id )
-	{
-		if ( $id > 0 )
-		{
-			$this->_ids[] = $id;
-		}
-		
-		return count( $this->_ids );
-	}
-	
-	/**
-	 * Gets an array of all the queries performed by the instance
+	 * Inserts performed using the insert methods
+	 * save the inserted ids to an array.
 	 *
 	 * @return array
 	 */
-	public function getLogs()
+	public function getInsertedIds()
 	{
-		return $this->_logs;
-	}
-	
-	/**
-	 * @param $whereData
-	 *
-	 * @return Where
-	 */
-	protected function getWhereClause( $whereData )
-	{
-		$where = new Where( $this->db );
-		$where->parseClause( $whereData );
-		
-		return $where;
+		return $this->_ids;
 	}
 	
 	/**
@@ -933,154 +1022,27 @@ class MySQL {
 	}
 	
 	/**
-	 * Escapes an associative array of [ keys => values ]
-	 * and returns an array with the escaped data
-	 * at $returnArray['keys'] & $returnArray['values']
+	 * Takes an iterator (closure) to process each row of returned data.
 	 *
-	 * @param array $insertList
+	 * @param callable $cb
 	 *
-	 * @return array
+	 * @return MySQL $this
 	 */
-	public function buildInserts( array $insertList )
+	public function iterateResult( callable $cb )
 	{
-		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $insertList );
+		$args = array_slice( func_get_args(), 1 );
 		
-		return [
-			'keys'   => implode( ',', $escapedKeyValuePairs['keys'] ),
-			'values' => implode( ',', $escapedKeyValuePairs['values'] ),
-		];
-	}
-	
-	/**
-	 * Escapes an associative array of [ keys => values ]
-	 * and returns an Update Statement string with the escaped data
-	 *
-	 * @param array $data
-	 *
-	 * @return string
-	 */
-	public function buildUpdate( array $data )
-	{
-		$updateList           = [];
-		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $data );
-		$length               = count( $escapedKeyValuePairs['keys'] );
-		
-		for ( $i = 0; $i < $length; $i++ )
+		if ( is_callable( $cb ) )
 		{
-			$updateList[] = "{$escapedKeyValuePairs['keys'][$i]}={$escapedKeyValuePairs['values'][$i]}";
-		}
-		
-		return implode( ', ', $updateList );
-	}
-	
-	/**
-	 * Escapes a value
-	 *
-	 * @param $string
-	 *
-	 * @return string
-	 */
-	public function escape( $string )
-	{
-		settype( $string, 'string' );
-		
-		return $this->db->real_escape_string( $string );
-	}
-	
-	/**
-	 * Wraps a column name in backticks
-	 *
-	 * @param $columnName
-	 *
-	 * @return string
-	 */
-	public function escapeColumnName( $columnName )
-	{
-		if ( $columnName === '*' )
-		{
-			return $columnName;
-		}
-		
-		return '`' . $this->escape( $columnName ) . '`';
-	}
-	
-	/**
-	 * Wraps an array of columns in backticks
-	 * and returns the escaped array
-	 *
-	 * @param array $colList
-	 *
-	 * @return array
-	 */
-	public function escapeColumnNames( array $colList )
-	{
-		$escapedList = [];
-		foreach ( $colList as $col )
-		{
-			$escapedList[] = $this->escapeColumnName( $col );
-		}
-		
-		return $escapedList;
-	}
-	
-	/**
-	 * @param array $assoc_array
-	 *
-	 * @return array
-	 */
-	public function escapeKeyValuePairs( array $assoc_array )
-	{
-		$keys   = [];
-		$values = [];
-		
-		foreach ( $assoc_array as $key => $val )
-		{
-			switch ( gettype( $val ) )
+			while ( $record = $this->queryResult->fetch_assoc() )
 			{
-				case 'object': # handle objects
-				case 'array': # and arrays the same
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = ("`$safeKey`");
-					
-					$jsonStrValue = json_encode( $val );
-					$safeValue    = $this->escape( $jsonStrValue );
-					$values[]     = "'$safeValue'";
-					break;
-				case 'string': # escape key & value and wrap in quotes
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = ("`$safeKey`");
-					
-					$safeValue = $this->escape( $val );
-					$values[]  = "'$safeValue'";
-					break;
-				case 'boolean': # booleans
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = "`$safeKey`";
-					
-					$values[] = $val ? 1 : 0;
-					break;
-				case 'NULL': # NULL
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = "`$safeKey`";
-					
-					$values[] = 'NULL';
-					break;
-				case 'double': # doubles
-				case 'integer': # & integers don't need escaping or quotations
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = "`$safeKey`";
-					
-					$values[] = $val;
-					break;
-				default: # if the value doesn't match these types,
-					break; # skip inclusion
+				$params = array_merge( [ $record ], $args );
+				
+				call_user_func_array( $cb, $params );
 			}
 		}
 		
-		return [
-			'keys'   => $keys,
-			'values' => $values,
-		];
+		return $this;
 	}
 	
 	/**
@@ -1094,27 +1056,6 @@ class MySQL {
 	{
 		return array_keys( $array ) !== range( 0, count( $array ) - 1 );
 	}
-	
-	/**
-	 * @param array $array
-	 *
-	 * @return bool
-	 */
-	public function isNumericArray( array $array )
-	{
-		return array_keys( $array ) === range( 0, count( $array ) - 1 );
-	}
-	
-	/**
-	 * Returns an array of any tables created by this instance
-	 *
-	 * @return array
-	 */
-	public function getCreatedTables()
-	{
-		return $this->createdTables;
-	}
-	
 	
 	/**
 	 * Returns the [string] name of the last created table
@@ -1143,6 +1084,56 @@ class MySQL {
 			}
 			, $this->getCreatedTables()
 		);
+	}
+	
+	/**
+	 * Drop a table
+	 *
+	 * @param $table
+	 *
+	 * @return \mysqli_result|null
+	 */
+	public function dropTable( $table )
+	{
+		$statement = "DROP TABLE {$table}";
+		$this->query( $statement );
+		
+		return $this->getResult();
+	}
+	
+	/**
+	 * Returns the last query executed
+	 *
+	 * @return null|string
+	 */
+	public function getLastQuery()
+	{
+		if ( isset( $this->_query ) )
+		{
+			return $this->_query;
+		}
+		
+		return NULL;
+	}
+	
+	/**
+	 * Get the last error from mysqli
+	 *
+	 * @return string
+	 */
+	public function getError()
+	{
+		return $this->db->error;
+	}
+	
+	/**
+	 * Returns an array of any tables created by this instance
+	 *
+	 * @return array
+	 */
+	public function getCreatedTables()
+	{
+		return $this->createdTables;
 	}
 	
 }

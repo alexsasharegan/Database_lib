@@ -18,30 +18,18 @@ class TableBuilder {
 	 * @var string
 	 */
 	private $tableName;
-	
-	/**
-	 * @return string
-	 */
-	public function getTableName()
-	{
-		return $this->tableName;
-	}
-	
 	/**
 	 * @var string
 	 */
 	private $collation = 'utf8_unicode_ci';
-	
 	/**
 	 * @var array
 	 */
 	private $fields = [];
-	
 	/**
 	 * @var string
 	 */
 	private $primaryKey = 'id';
-	
 	/**
 	 * @var string
 	 */
@@ -70,6 +58,14 @@ class TableBuilder {
 		$this->fields[] = $tableField;
 		
 		return $tableField;
+	}
+	
+	/**
+	 * @return string
+	 */
+	public function getTableName()
+	{
+		return $this->tableName;
 	}
 	
 	/**

@@ -19,6 +19,23 @@ class BadQuery extends \Exception implements \JsonSerializable {
 	private $logs;
 	
 	/**
+	 * BadQuery constructor.
+	 *
+	 * @param string          $query
+	 * @param int             $mysqliErrorMsg
+	 * @param array           $logs
+	 * @param int             $code
+	 * @param \Exception|NULL $previous
+	 */
+	public function __construct( $query, $mysqliErrorMsg, array $logs, $code = 0, \Exception $previous = NULL )
+	{
+		$this->query = $query;
+		$message     = $mysqliErrorMsg;
+		$this->logs  = $logs;
+		parent::__construct( $message, $code, $previous );
+	}
+	
+	/**
 	 * @return string
 	 */
 	public function getQuery()
@@ -48,23 +65,6 @@ class BadQuery extends \Exception implements \JsonSerializable {
 	public function setLogs( $logs )
 	{
 		$this->logs = $logs;
-	}
-	
-	/**
-	 * BadQuery constructor.
-	 *
-	 * @param string          $query
-	 * @param int             $mysqliErrorMsg
-	 * @param array           $logs
-	 * @param int             $code
-	 * @param \Exception|NULL $previous
-	 */
-	public function __construct( $query, $mysqliErrorMsg, array $logs, $code = 0, \Exception $previous = NULL )
-	{
-		$this->query = $query;
-		$message     = $mysqliErrorMsg;
-		$this->logs  = $logs;
-		parent::__construct( $message, $code, $previous );
 	}
 	
 	/**

@@ -29,26 +29,13 @@ class Where {
 	}
 	
 	/**
-	 * @param string $type
-	 *
-	 * @return Where|Where\Clause
-	 */
-	public function addClause( $type = 'AND' )
-	{
-		$clause           = new Where\Clause( $this->_db, $type );
-		$this->_clauses[] = $clause;
-		
-		return $clause;
-	}
-	
-	/**
 	 * @param array $whereClauses
 	 *
 	 * @return string
 	 */
 	public function parseClause( $whereClauses = [] )
 	{
-		if ( empty($whereClauses) )
+		if ( empty( $whereClauses ) )
 		{
 			return strval( $this );
 		}
@@ -82,11 +69,24 @@ class Where {
 	}
 	
 	/**
+	 * @param string $type
+	 *
+	 * @return Where|Where\Clause
+	 */
+	public function addClause( $type = 'AND' )
+	{
+		$clause           = new Where\Clause( $this->_db, $type );
+		$this->_clauses[] = $clause;
+		
+		return $clause;
+	}
+	
+	/**
 	 * @return string
 	 */
 	public function __toString()
 	{
-		if ( empty($this->_clauses) )
+		if ( empty( $this->_clauses ) )
 		{
 			return '';
 		}

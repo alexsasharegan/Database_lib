@@ -15,31 +15,21 @@ namespace Database\Utils;
 class Timer {
 	
 	/**
-	 * @var float
-	 */
-	private $start;
-	
-	/**
-	 * @var
-	 */
-	private $end;
-	
-	/**
 	 * @var null
 	 */
 	public $time = NULL;
 	/**
+	 * @var float
+	 */
+	private $start;
+	/**
+	 * @var
+	 */
+	private $end;
+	/**
 	 * @var int
 	 */
 	private $precision;
-	
-	/**
-	 * @return float
-	 */
-	private function now()
-	{
-		return microtime( TRUE );
-	}
 	
 	/**
 	 * Timer constructor.
@@ -53,6 +43,14 @@ class Timer {
 	}
 	
 	/**
+	 * @return float
+	 */
+	private function now()
+	{
+		return microtime( TRUE );
+	}
+	
+	/**
 	 * @return null
 	 */
 	public function stop()
@@ -61,43 +59,6 @@ class Timer {
 		$this->setTime( $this->calcTime( $this->end, $this->start ) );
 		
 		return $this->time;
-	}
-	
-	/**
-	 * @return float|null
-	 */
-	public function getTime()
-	{
-		if ( ! is_null( $this->time ) ):
-			return $this->time;
-		else:
-			return $this->calcTime( $this->now(), $this->start );
-		endif;
-	}
-	
-	/**
-	 * @return float
-	 */
-	public function getCurrentTime()
-	{
-		return $this->calcTime( $this->now(), $this->start );
-	}
-	
-	public function lap()
-	{
-		return $this->getCurrentTime();
-	}
-	
-	/**
-	 * @return string
-	 */
-	public function __toString()
-	{
-		if ( isset($this->time) ):
-			return (string) $this->time;
-		else:
-			return (string) $this->getTime();
-		endif;
 	}
 	
 	/**
@@ -115,5 +76,42 @@ class Timer {
 	private function calcTime( $end, $start )
 	{
 		return round( ($end - $start), $this->precision );
+	}
+	
+	public function lap()
+	{
+		return $this->getCurrentTime();
+	}
+	
+	/**
+	 * @return float
+	 */
+	public function getCurrentTime()
+	{
+		return $this->calcTime( $this->now(), $this->start );
+	}
+	
+	/**
+	 * @return string
+	 */
+	public function __toString()
+	{
+		if ( isset( $this->time ) ):
+			return (string) $this->time;
+		else:
+			return (string) $this->getTime();
+		endif;
+	}
+	
+	/**
+	 * @return float|null
+	 */
+	public function getTime()
+	{
+		if ( ! is_null( $this->time ) ):
+			return $this->time;
+		else:
+			return $this->calcTime( $this->now(), $this->start );
+		endif;
 	}
 }

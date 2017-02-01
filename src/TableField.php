@@ -57,6 +57,16 @@ class TableField {
 	private $_userInputType;
 	
 	/**
+	 * TableField constructor: takes the name of the table to be created.
+	 *
+	 * @param string $fieldName
+	 */
+	public function __construct( $fieldName )
+	{
+		$this->fieldName = $fieldName;
+	}
+	
+	/**
 	 * @return string
 	 */
 	public function getForeignKeyTable()
@@ -70,16 +80,6 @@ class TableField {
 	public function getForeignKeyField()
 	{
 		return $this->foreignKeyField;
-	}
-	
-	/**
-	 * TableField constructor: takes the name of the table to be created.
-	 *
-	 * @param string $fieldName
-	 */
-	public function __construct( $fieldName )
-	{
-		$this->fieldName = $fieldName;
 	}
 	
 	/**
@@ -209,6 +209,14 @@ class TableField {
 	}
 	
 	/**
+	 * @return mixed
+	 */
+	public function getUserInputType()
+	{
+		return $this->_userInputType;
+	}
+	
+	/**
 	 * Imposes a foreign key constraint on the field
 	 *
 	 * @param string $referenceTable
@@ -240,14 +248,6 @@ class TableField {
 		$modifiers = implode( ' ', $this->modifiers );
 		
 		return "`{$this->fieldName}` {$this->type} {$modifiers}";
-	}
-	
-	/**
-	 * @return mixed
-	 */
-	public function getUserInputType()
-	{
-		return $this->_userInputType;
 	}
 	
 }
