@@ -911,9 +911,17 @@ class MySQL {
 	 * @param \Closure $cb
 	 *
 	 * @return array
+	 * @throws \Exception
 	 */
-	public function mapResult( \Closure $cb )
+	public function mapResult( $cb = NULL )
 	{
+		if ( is_null( $cb ) ) $cb = function ( array $row ) { return $row; };
+		
+		if ( ! $cb instanceof \Closure )
+		{
+			throw new \Exception( "Callback function must be an instance of \\Closure." );
+		}
+		
 		$newArray = [];
 		
 		while ( $record = $this->queryResult->fetch_assoc() )
