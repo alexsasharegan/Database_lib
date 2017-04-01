@@ -549,14 +549,11 @@ class MySQL {
 	{
 		if ( empty( $database ) ) $database = $this->con['DB_NAME'];
 		
-		$selectColumns = "SELECT column_name FROM information_schema.columns WHERE table_name = ? AND table_schema = ?";
+		$selectColumns = "SELECT column_name FROM information_schema.columns WHERE table_name=? AND table_schema=?";
 		
 		return $this->prepare( $selectColumns )
 		            ->execute( [ $table, $database ] )
-		            ->map( function ( array $row ) use ( &$columns )
-		            {
-			            return $row['column_name'];
-		            }, PDO::FETCH_ASSOC );
+		            ->map( function ( array $row ) { return $row['column_name']; }, PDO::FETCH_ASSOC );
 	}
 	
 	/**
