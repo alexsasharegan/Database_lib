@@ -115,7 +115,7 @@ class QueryBuilder {
 	 * @param string $operator
 	 * @param null   $conjunction
 	 *
-	 * @return $this
+	 * @return static
 	 */
 	public function where( $key, $value, $operator = '=', $conjunction = NULL )
 	{
@@ -146,7 +146,7 @@ class QueryBuilder {
 	 * @param        $value
 	 * @param string $operator
 	 *
-	 * @return QueryBuilder
+	 * @return static
 	 */
 	public function andWhere( $key, $value, $operator = '=' )
 	{
@@ -158,7 +158,7 @@ class QueryBuilder {
 	 * @param        $value
 	 * @param string $operator
 	 *
-	 * @return QueryBuilder
+	 * @return static
 	 */
 	public function orWhere( $key, $value, $operator = '=' )
 	{
@@ -170,14 +170,65 @@ class QueryBuilder {
 	 * @param array $fields
 	 * @param array $allowedFields
 	 *
-	 * @return $this
+	 * @return static
 	 */
 	public static function select( MySQL $mySQL, array $fields = [], array $allowedFields = [] )
 	{
-		$builder = new self( $mySQL, $allowedFields );
+		$builder = new static( $mySQL, $allowedFields );
 		
-		return $builder->setMethod( self::SELECT )
-		               ->setFields( $fields );
+		$builder->setMethod( self::SELECT )
+		        ->setFields( $fields );
+		
+		return $builder;
+	}
+	
+	/**
+	 * @param MySQL $mySQL
+	 * @param array $data
+	 * @param array $allowedFields
+	 *
+	 * @return static
+	 */
+	public static function insert( MySQL $mySQL, array $data = [], array $allowedFields = [] )
+	{
+		$builder = new static( $mySQL, $allowedFields );
+		
+		$builder->setMethod( self::INSERT )
+		        ->setData( $data );
+		
+		return $builder;
+	}
+	
+	/**
+	 * @param MySQL $mySQL
+	 * @param array $data
+	 * @param array $allowedFields
+	 *
+	 * @return static
+	 */
+	public static function update( MySQL $mySQL, array $data = [], array $allowedFields = [] )
+	{
+		$builder = new static( $mySQL, $allowedFields );
+		
+		$builder->setMethod( self::UPDATE )
+		        ->setData( $data );
+		
+		return $builder;
+	}
+	
+	/**
+	 * @param MySQL $mySQL
+	 * @param array $allowedFields
+	 *
+	 * @return static
+	 */
+	public static function delete( MySQL $mySQL, array $allowedFields = [] )
+	{
+		$builder = new static( $mySQL, $allowedFields );
+		
+		$builder->setMethod( self::DELETE );
+		
+		return $builder;
 	}
 	
 	/**
@@ -329,4 +380,6 @@ class QueryBuilder {
 	{
 		return $this->mySQL->query( $this );
 	}
+	
+	protected function setData( array $data ) { }
 }

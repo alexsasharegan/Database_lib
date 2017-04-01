@@ -70,10 +70,6 @@ class MySQL {
 	 * @var array
 	 */
 	protected $createdTables = [];
-	/**
-	 * @var array
-	 */
-	protected $_ids = [];
 	
 	/**
 	 * @param $SQLDate
@@ -230,13 +226,14 @@ class MySQL {
 	}
 	
 	/**
-	 * @param $fn
+	 * @param     $fn
+	 * @param int $fetchStyle
 	 *
 	 * @return $this
 	 */
-	public function each( $fn )
+	public function each( $fn, $fetchStyle = PDO::FETCH_ASSOC )
 	{
-		while ( $row = $this->stmt->fetch() )
+		while ( $row = $this->stmt->fetch( $fetchStyle ) )
 		{
 			call_user_func( $fn, $row );
 		}
@@ -245,17 +242,18 @@ class MySQL {
 	}
 	
 	/**
-	 * @param $mapFn
+	 * @param null $mapFn
+	 * @param int  $fetchStyle
 	 *
 	 * @return array
 	 */
-	public function map( $mapFn = NULL )
+	public function map( $mapFn = NULL, $fetchStyle = PDO::FETCH_ASSOC )
 	{
 		$mapped = [];
 		
 		if ( is_null( $mapFn ) ) $mapFn = [ $this, 'identity' ];
 		
-		while ( $row = $this->stmt->fetch() )
+		while ( $row = $this->stmt->fetch( $fetchStyle ) )
 		{
 			$mapped[] = call_user_func( $mapFn, $row );
 		}
@@ -266,14 +264,15 @@ class MySQL {
 	/**
 	 * @param      $reduceFn
 	 * @param null $initial
+	 * @param int  $fetchStyle
 	 *
 	 * @return mixed|null
 	 */
-	public function reduce( $reduceFn, $initial = NULL )
+	public function reduce( $reduceFn, $initial = NULL, $fetchStyle = PDO::FETCH_ASSOC )
 	{
 		$carry = $initial;
 		
-		while ( $row = $this->stmt->fetch() )
+		while ( $row = $this->stmt->fetch( $fetchStyle ) )
 		{
 			$carry = call_user_func( $reduceFn, $carry, $row );
 		}
@@ -282,15 +281,16 @@ class MySQL {
 	}
 	
 	/**
-	 * @param $filterFn
+	 * @param     $filterFn
+	 * @param int $fetchStyle
 	 *
 	 * @return array
 	 */
-	public function filter( $filterFn )
+	public function filter( $filterFn, $fetchStyle = PDO::FETCH_ASSOC )
 	{
 		$filtered = [];
 		
-		while ( $row = $this->stmt->fetch() )
+		while ( $row = $this->stmt->fetch( $fetchStyle ) )
 		{
 			if ( call_user_func( $filterFn, $row ) ) $filtered[] = $row;
 		}
@@ -299,15 +299,16 @@ class MySQL {
 	}
 	
 	/**
-	 * @param $rejectFn
+	 * @param     $rejectFn
+	 * @param int $fetchStyle
 	 *
 	 * @return array
 	 */
-	public function reject( $rejectFn )
+	public function reject( $rejectFn, $fetchStyle = PDO::FETCH_ASSOC )
 	{
 		$filtered = [];
 		
-		while ( $row = $this->stmt->fetch() )
+		while ( $row = $this->stmt->fetch( $fetchStyle ) )
 		{
 			if ( ! call_user_func( $rejectFn, $row ) ) $filtered[] = $row;
 		}
@@ -414,61 +415,35 @@ class MySQL {
 	}
 	
 	/**
-	 * Insert a single row by passing the table,
-	 * an associative array of fields => values to insert,
-	 * and [optional] a boolean whether or not to update on duplicate with the same data set
-	 * Returns the insert id or false
+	 * @param array $data
+	 * @param array $allowedFields
 	 *
-	 * @param string $table
-	 * @param array  $insertPairs
-	 * @param bool   $update
-	 *
-	 * @return bool|integer
+	 * @return QueryBuilder
 	 */
-	public function insert( $table, array $insertPairs, $update = FALSE )
+	public function insert( array $data = [], array $allowedFields = [] )
 	{
-		if ( empty( $insertPairs ) )
-		{
-			return FALSE;
-		}
-		
-		$escapedInserts = $this->buildInserts( $insertPairs );
-		
-		if ( $update )
-		{
-			$updateStatement = $this->buildUpdate( $insertPairs );
-			$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE {$updateStatement};" );
-		}
-		else
-		{
-			$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']});" );
-		}
-		
-		if ( $this->getResult() === TRUE )
-		{
-			$this->pushId( $this->insertId() );
-			
-			return $this->insertId();
-		}
-		else
-		{
-			return FALSE;
-		}
+		return QueryBuilder::insert( $this, $data, $allowedFields );
 	}
 	
 	/**
-	 * @param $id
+	 * @param array $data
+	 * @param array $allowedFields
 	 *
-	 * @return int
+	 * @return QueryBuilder
 	 */
-	protected function pushId( $id )
+	public function update( array $data = [], array $allowedFields = [] )
 	{
-		if ( $id > 0 )
-		{
-			$this->_ids[] = $id;
-		}
-		
-		return count( $this->_ids );
+		return QueryBuilder::update( $this, $data, $allowedFields );
+	}
+	
+	/**
+	 * @param array $allowedFields
+	 *
+	 * @return QueryBuilder
+	 */
+	public function delete( array $allowedFields = [] )
+	{
+		return QueryBuilder::delete( $this, $allowedFields );
 	}
 	
 	/**
@@ -476,7 +451,7 @@ class MySQL {
 	 *
 	 * @return null|integer
 	 */
-	public function insertId()
+	public function lastInsertId()
 	{
 		$id = $this->pdo->lastInsertId();
 		
@@ -486,44 +461,6 @@ class MySQL {
 		}
 		
 		return NULL;
-	}
-	
-	/**
-	 * Insert a single row by passing the table,
-	 * an associative array of fields => values to insert,
-	 * and an associative array of fields => values to update on duplicate
-	 * Returns the insert id or false
-	 *
-	 * @param string $table
-	 * @param array  $insertPairs
-	 * @param array  $updatePairs
-	 *
-	 * @throws \InvalidArgumentException
-	 *
-	 * @return bool|integer
-	 */
-	public function insertOnUpdate( $table, array $insertPairs, array $updatePairs )
-	{
-		if ( empty( $insertPairs ) || empty( $updatePairs ) )
-		{
-			throw new \InvalidArgumentException( "Insert data cannot be empty." );
-		}
-		
-		$escapedInserts  = $this->buildInserts( $insertPairs );
-		$updateStatement = $this->buildUpdate( $updatePairs );
-		
-		$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE {$updateStatement};" );
-		
-		if ( $this->getResult() === TRUE )
-		{
-			$this->pushId( $this->insertId() );
-			
-			return $this->insertId();
-		}
-		else
-		{
-			return FALSE;
-		}
 	}
 	
 	/**
@@ -560,55 +497,6 @@ class MySQL {
 	}
 	
 	/**
-	 * @param array $array
-	 *
-	 * @return bool
-	 */
-	public function isNumericArray( array $array )
-	{
-		return array_keys( $array ) === range( 0, count( $array ) - 1 );
-	}
-	
-	/**
-	 * Update records by passing the table,
-	 * an associative array of fields => values to update,
-	 * and [optional] a where clause
-	 * Returns the number of rows affected by the query
-	 *
-	 * Where clauses can be:
-	 * - a string (the raw statement: "WHERE `field`=value"; You must escape values)
-	 * - an array: [ 'key' => value ] @see http://medoo.in/api/where since their api is similar
-	 * - an integer: this will yield a "WHERE `id`=$intValue" where clause for convenience
-	 *
-	 * @param        $table
-	 * @param        $data
-	 * @param string $where
-	 *
-	 * @return int
-	 */
-	public function update( $table, $data, $where = '' )
-	{
-		$escapedData = $this->buildUpdate( $data );
-		
-		if ( is_integer( $where ) )
-		{
-			$WHERE = "WHERE `id`={$where} LIMIT 1";
-		}
-		elseif ( is_array( $where ) )
-		{
-			$WHERE = $this->getWhereClause( $where );
-		}
-		else
-		{
-			$WHERE = $where;
-		}
-		
-		$this->query( "UPDATE `{$table}` SET {$escapedData} {$WHERE}" );
-		
-		return $this->rowCount();
-	}
-	
-	/**
 	 * Returns the number of rows affected by the last query
 	 * (inserts, updates, deletes)
 	 *
@@ -617,41 +505,6 @@ class MySQL {
 	public function rowCount()
 	{
 		return $this->stmt->rowCount();
-	}
-	
-	/**
-	 * Delete records by passing the table
-	 * and [optional] a where clause
-	 * Returns the number of rows affected by the query
-	 *
-	 * Where clauses can be:
-	 * - a string (the raw statement: "WHERE `field`=value"; You must escape values)
-	 * - an array: [ 'key' => value ] @see http://medoo.in/api/where since their api is similar
-	 * - an integer: this will yield a "WHERE `id`=$intValue" where clause for convenience
-	 *
-	 * @param        $table
-	 * @param string $where
-	 *
-	 * @return int|null
-	 */
-	public function delete( $table, $where = '' )
-	{
-		if ( is_integer( $where ) )
-		{
-			$WHERE = "WHERE `id`={$where} LIMIT 1";
-		}
-		elseif ( is_array( $where ) )
-		{
-			$WHERE = $this->getWhereClause( $where );
-		}
-		else
-		{
-			$WHERE = $where;
-		}
-		
-		$this->query( "DELETE FROM `{$table}` {$WHERE}" );
-		
-		return $this->affectedRows();
 	}
 	
 	/**
@@ -684,55 +537,6 @@ class MySQL {
 	}
 	
 	/**
-	 * Returns the last inserted id
-	 * Alias of MySQL::insertId
-	 *
-	 * @see MySQL::insertId()
-	 *
-	 * @return int|null
-	 */
-	public function lastId()
-	{
-		return $this->insertId();
-	}
-	
-	/**
-	 * Returns the last inserted id
-	 * Alias of MySQL::insertId
-	 *
-	 * @see MySQL::insertId()
-	 *
-	 * @return int|null
-	 */
-	public function id()
-	{
-		return $this->insertId();
-	}
-	
-	/**
-	 * ALias for getInsertedIds
-	 *
-	 * @see MySQL::getInsertedIds()
-	 *
-	 * @return array
-	 */
-	public function getIds()
-	{
-		return $this->getInsertedIds();
-	}
-	
-	/**
-	 * Inserts performed using the insert methods
-	 * save the inserted ids to an array.
-	 *
-	 * @return array
-	 */
-	public function getInsertedIds()
-	{
-		return $this->_ids;
-	}
-	
-	/**
 	 * Get an array of all the columns in a given table [, and a given database ]
 	 * Database defaults to the current connected database.
 	 *
@@ -752,7 +556,7 @@ class MySQL {
 		            ->map( function ( array $row ) use ( &$columns )
 		            {
 			            return $row['column_name'];
-		            } );
+		            }, PDO::FETCH_ASSOC );
 	}
 	
 	/**
