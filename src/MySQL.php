@@ -340,6 +340,29 @@ class MySQL {
 	}
 	
 	/**
+	 * @param array $params
+	 * @param array $allowedParams
+	 *
+	 * @return array
+	 */
+	public function getNamedParams( array $params, array $allowedParams = [] )
+	{
+		$keys = $params;
+		
+		$mapPlaceholders = function ( $key ) { return sprintf( ":%s", $key ); };
+		
+		if ( count( $allowedParams ) )
+		{
+			$keys = array_filter( $keys, function ( $key ) use ( $allowedParams )
+			{
+				return in_array( $key, $allowedParams );
+			} );
+		}
+		
+		return array_map( $mapPlaceholders, $keys );
+	}
+	
+	/**
 	 * @param $query
 	 *
 	 * @return $this
@@ -449,18 +472,11 @@ class MySQL {
 	/**
 	 * Returns the last inserted id from mysqli
 	 *
-	 * @return null|integer
+	 * @return int
 	 */
 	public function lastInsertId()
 	{
-		$id = $this->pdo->lastInsertId();
-		
-		if ( $id > 0 )
-		{
-			return $id;
-		}
-		
-		return NULL;
+		return (int) $this->pdo->lastInsertId();
 	}
 	
 	/**

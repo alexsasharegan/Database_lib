@@ -29,7 +29,11 @@ class QueryBuilder {
 	/**
 	 * @var array
 	 */
-	protected $fields;
+	protected $selectFields;
+	/**
+	 * @var array
+	 */
+	protected $dmlFields;
 	/**
 	 * @var array
 	 */
@@ -81,18 +85,12 @@ class QueryBuilder {
 	 *
 	 * @return $this
 	 */
-	public function setFields( array $fields = [] )
+	public function setSelectFields( array $fields = [] )
 	{
-		if ( empty( $fields ) )
-		{
-			$fields[] = '*';
-		}
-		else
-		{
-			$fields = $this->filterFields( $fields );
-		}
+		if ( empty( $fields ) ) $fields[] = '*';
+		else $fields = $this->filterFields( $fields );
 		
-		$this->fields = $fields;
+		$this->selectFields = $fields;
 		
 		return $this;
 	}
@@ -104,7 +102,22 @@ class QueryBuilder {
 	 */
 	public function from( $table )
 	{
-		$this->table = $table;
+		return $this->table( $table );
+	}
+	
+	/**
+	 * @param $table
+	 *
+	 * @return $this
+	 */
+	public function into( $table )
+	{
+		return $this->table( $table );
+	}
+	
+	public function table( $table )
+	{
+		$this->table = $this->escapeTable( $table );
 		
 		return $this;
 	}
@@ -121,7 +134,9 @@ class QueryBuilder {
 	{
 		if ( $this->isValidField( $key ) )
 		{
-			$args = func_get_args();
+			$args     = func_get_args();
+			$operator = strtoupper( $operator );
+			if ( count( $this->whereClauses ) && is_null( $conjunction ) ) $conjunction = self::WHERE_CONJUNCTIONS[0];
 			
 			if ( count( $args ) == 2 && in_array( $args[1], self::WHERE_OPS_SPECIAL ) )
 			{
@@ -170,14 +185,14 @@ class QueryBuilder {
 	 * @param array $fields
 	 * @param array $allowedFields
 	 *
-	 * @return static
+	 * @return QueryBuilder
 	 */
 	public static function select( MySQL $mySQL, array $fields = [], array $allowedFields = [] )
 	{
-		$builder = new static( $mySQL, $allowedFields );
+		$builder = new self( $mySQL, $allowedFields );
 		
 		$builder->setMethod( self::SELECT )
-		        ->setFields( $fields );
+		        ->setSelectFields( $fields );
 		
 		return $builder;
 	}
@@ -187,11 +202,11 @@ class QueryBuilder {
 	 * @param array $data
 	 * @param array $allowedFields
 	 *
-	 * @return static
+	 * @return QueryBuilder
 	 */
 	public static function insert( MySQL $mySQL, array $data = [], array $allowedFields = [] )
 	{
-		$builder = new static( $mySQL, $allowedFields );
+		$builder = new self( $mySQL, $allowedFields );
 		
 		$builder->setMethod( self::INSERT )
 		        ->setData( $data );
@@ -204,11 +219,11 @@ class QueryBuilder {
 	 * @param array $data
 	 * @param array $allowedFields
 	 *
-	 * @return static
+	 * @return QueryBuilder
 	 */
 	public static function update( MySQL $mySQL, array $data = [], array $allowedFields = [] )
 	{
-		$builder = new static( $mySQL, $allowedFields );
+		$builder = new self( $mySQL, $allowedFields );
 		
 		$builder->setMethod( self::UPDATE )
 		        ->setData( $data );
@@ -220,11 +235,11 @@ class QueryBuilder {
 	 * @param MySQL $mySQL
 	 * @param array $allowedFields
 	 *
-	 * @return static
+	 * @return QueryBuilder
 	 */
 	public static function delete( MySQL $mySQL, array $allowedFields = [] )
 	{
-		$builder = new static( $mySQL, $allowedFields );
+		$builder = new self( $mySQL, $allowedFields );
 		
 		$builder->setMethod( self::DELETE );
 		
@@ -240,14 +255,14 @@ class QueryBuilder {
 		{
 			case self::SELECT:
 				return $this->renderSelect();
-			// case self::INSERT:
-			// 	return $this->renderInsert();
+			case self::INSERT:
+				return $this->renderInsert();
 			// case self::UPDATE:
 			// 	return $this->renderUpdate();
 			// case self::DELETE:
 			// 	return $this->renderDelete();
 			default:
-				break;
+				throw new \InvalidArgumentException( 'Missing database method!' );
 		}
 	}
 	
@@ -258,9 +273,9 @@ class QueryBuilder {
 	{
 		$baseStmt = [
 			$this->method,
-			implode( ',', $this->fields ),
+			implode( ',', $this->selectFields ),
 			'FROM',
-			sprintf( '`%s`', trim( $this->table, '`' ) ),
+			$this->table,
 		];
 		
 		if ( count( $this->whereClauses ) )
@@ -270,6 +285,79 @@ class QueryBuilder {
 		}
 		
 		return implode( ' ', $baseStmt );
+	}
+	
+	/**
+	 * @return string
+	 */
+	public function renderInsert()
+	{
+		$baseStmt = [
+			$this->method,
+			'INTO',
+			$this->table,
+			sprintf( '(%s)', implode( ', ', $this->dmlFields ) ),
+			'VALUES',
+			sprintf( '(%s)', implode( ', ', $this->mySQL->getNamedParams( $this->dmlFields ) ) ),
+		];
+		
+		if ( count( $this->whereClauses ) )
+		{
+			$baseStmt[] = "WHERE";
+			$baseStmt[] = $this->renderWhereClause();
+		}
+		
+		return implode( ' ', $baseStmt );
+	}
+	
+	protected function renderWhereClause()
+	{
+		$clause = [];
+		
+		foreach ( $this->whereClauses as $whereClause )
+		{
+			// FORMAT: [ [ $key => $value ], $operator, NULL ]
+			$base = [];
+			list( $kvPair, $operator, $conjunction ) = $whereClause;
+			list( $placeholder ) = $this->mySQL->getNamedParamsFromAssoc( $kvPair, $this->allowedFields );
+			$key   = array_keys( $kvPair )[0];
+			$value = $kvPair[ $key ];
+			
+			if ( $conjunction ) $base[] = $conjunction;
+			
+			if ( is_null( $value ) && in_array( $operator, self::WHERE_OPS_SPECIAL ) )
+			{
+				$base[] = $key;
+				$base[] = $operator;
+			}
+			elseif ( $operator === 'IN' && is_array( $value ) )
+			{
+				$base[] = $key;
+				$base[] = $operator;
+				unset( $this->boundParams[ $key ] );
+				$placeholders = [];
+				
+				foreach ( $value as $i => $item )
+				{
+					$tmpKey         = sprintf( '%s%d', $key, $i );
+					$placeholders[] = sprintf( ':%s', $tmpKey );
+					
+					$this->boundParams[ $tmpKey ] = $item;
+				}
+				
+				$base[] = sprintf( '(%s)', implode( ', ', $placeholders ) );
+			}
+			else
+			{
+				$base[] = $key;
+				$base[] = $operator;
+				$base[] = $placeholder;
+			}
+			
+			$clause[] = implode( ' ', $base );
+		}
+		
+		return implode( ' ', $clause );
 	}
 	
 	/**
@@ -315,6 +403,28 @@ class QueryBuilder {
 	}
 	
 	/**
+	 * @param array $data
+	 *
+	 * @return array
+	 */
+	protected function filterAllowedData( array $data )
+	{
+		if ( empty( $this->allowedFields ) ) return $data;
+		
+		$filtered = [];
+		
+		foreach ( $data as $key => $value )
+		{
+			if ( in_array( $key, $this->allowedFields ) )
+			{
+				$filtered[ $key ] = $value;
+			}
+		}
+		
+		return $filtered;
+	}
+	
+	/**
 	 * @param $op
 	 *
 	 * @return bool
@@ -332,37 +442,17 @@ class QueryBuilder {
 		return TRUE;
 	}
 	
-	protected function renderWhereClause()
+	/**
+	 * @param $table
+	 *
+	 * @return string
+	 */
+	protected function escapeTable( $table )
 	{
-		$clause = [];
-		
-		foreach ( $this->whereClauses as $whereClause )
-		{
-			// FORMAT: [ [ $key => $value ], $operator, NULL ]
-			$base = [];
-			list( $kvPair, $operator, $conjunction ) = $whereClause;
-			list( $placeholder ) = $this->mySQL->getNamedParamsFromAssoc( $kvPair, $this->allowedFields );
-			$key   = array_keys( $kvPair )[0];
-			$value = $kvPair[ $key ];
-			
-			if ( $conjunction ) $base[] = $conjunction;
-			
-			if ( is_null( $value ) )
-			{
-				$base[] = $key;
-				$base[] = $operator;
-			}
-			else
-			{
-				$base[] = $key;
-				$base[] = $operator;
-				$base[] = $placeholder;
-			}
-			
-			$clause[] = implode( ' ', $base );
-		}
-		
-		return implode( ' ', $clause );
+		return sprintf(
+			'`%s`',
+			str_replace( '`', '', $table )
+		);
 	}
 	
 	/**
@@ -381,5 +471,18 @@ class QueryBuilder {
 		return $this->mySQL->query( $this );
 	}
 	
-	protected function setData( array $data ) { }
+	public function setData( array $data )
+	{
+		$allowedData     = $this->filterAllowedData( $data );
+		$this->dmlFields = array_keys( $allowedData );
+		
+		$this->boundParams = array_merge( $this->boundParams, $allowedData );
+		
+		return $this;
+	}
+	
+	public function __toString()
+	{
+		return $this->renderQuery();
+	}
 }
