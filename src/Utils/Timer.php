@@ -15,7 +15,7 @@ namespace Database\Utils;
 class Timer {
 	
 	/**
-	 * @var null
+	 * @var string
 	 */
 	public $time = NULL;
 	/**

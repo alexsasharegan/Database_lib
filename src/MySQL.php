@@ -4,6 +4,7 @@ namespace Database;
 
 use Database\Exceptions\BadQuery;
 use Database\Utils\Timer;
+use PDO;
 
 /**
  * Class MySQL
@@ -11,137 +12,75 @@ use Database\Utils\Timer;
  */
 class MySQL {
 	
-	/**
-	 *
-	 */
-	const CONFIG = './database.json';
-	
 	const TIME_FORMAT = 'Y-m-d H:i:s';
-	/**
-	 * @var string
-	 */
-	public static $lc_alpha = 'abcdefghijklmnopqrstuvwxyz';
-	/**
-	 * @var string
-	 */
-	public static $numeric = '0123456789';
-	/**
-	 * @var string
-	 */
-	public static $hex = '0123456789abcdef';
-	/**
-	 * @var \mysqli|null
-	 */
-	public $db = NULL;
-	/**
-	 * @var
-	 */
-	public $_where;
-	/**
-	 * @var \mysqli_result|null
-	 */
-	public $queryResult = NULL;
+	
+	const DSN_FORMAT = 'mysql:host=%s;dbname=%s;port=%s;charset=%s';
 	/**
 	 * @var array
 	 */
-	public $columns = [];
-	/**
-	 * @var string
-	 */
-	private $_host;
-	/**
-	 * @var string
-	 */
-	private $_database;
-	/**
-	 * @var string
-	 */
-	private $_username;
-	/**
-	 * @var string
-	 */
-	private $_password;
-	/**
-	 * @var string
-	 */
-	private $_query = '';
+	protected $conDefaults = [
+		'DB_HOST'     => '127.0.0.1',
+		'DB_NAME'     => 'test',
+		'DB_PORT'     => '3306',
+		'DB_CHARSET'  => 'utf8',
+		'DB_USERNAME' => 'admin',
+		'DB_PASSWORD' => 'admin',
+	];
 	/**
 	 * @var array
 	 */
-	private $_logs = [];
+	protected $con = [];
 	/**
 	 * @var array
 	 */
-	private $createdTables = [];
+	protected $optDefaults = [
+		PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+		PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+		PDO::ATTR_EMULATE_PREPARES   => FALSE,
+		PDO::ATTR_STRINGIFY_FETCHES  => FALSE,
+	];
 	/**
 	 * @var array
 	 */
-	private $_ids = [];
+	protected $opt = [];
+	/**
+	 * @var PDO
+	 */
+	protected $pdo;
+	/**
+	 * @var \PDOStatement
+	 */
+	protected $stmt;
+	/**
+	 * @var array
+	 */
+	protected $columns = [];
+	/**
+	 * @var string
+	 */
+	protected $query = '';
+	/**
+	 * @var array
+	 */
+	protected $logs = [];
+	/**
+	 * @var Timer
+	 */
+	protected $timer = NULL;
+	/**
+	 * @var array
+	 */
+	protected $createdTables = [];
 	
 	/**
-	 * MySQL constructor. Pass in the path to a json config file.
+	 * @param $SQLDate
 	 *
-	 * Recommended to always use __DIR__ to qualify the path.
-	 *
-	 * @param string $configFile
-	 * @param array  $options
-	 *
-	 * @throws \Exception
+	 * @return null|string
 	 */
-	function __construct( $configFile = './database.json', array $options = [] )
-	{
-		
-		if ( empty( $configFile ) )
-		{
-			$this->_host     = $options['host'];
-			$this->_database = $options['database'];
-			$this->_username = $options['username'];
-			$this->_password = $options['password'];
-		}
-		elseif ( ! empty( $configFile ) && empty( $options ) )
-		{
-			$config          = json_decode( file_get_contents( $configFile ) );
-			$this->_host     = $config->host;
-			$this->_database = $config->database;
-			$this->_username = $config->username;
-			$this->_password = $config->password;
-		}
-		elseif ( ! empty( $configFile ) && ! empty( $options ) )
-		{
-			$config          = json_decode( file_get_contents( $configFile ) );
-			$this->_host     = ! empty( $options['host'] ) ? $options['host'] : $config->host;
-			$this->_database = ! empty( $options['database'] ) ? $options['database'] : $config->database;
-			$this->_username = ! empty( $options['username'] ) ? $options['username'] : $config->username;
-			$this->_password = ! empty( $options['password'] ) ? $options['password'] : $config->password;
-		}
-		
-		$mysqli = new \mysqli( $this->_host, $this->_username, $this->_password, $this->_database );
-		
-		
-		if ( $errorCode = mysqli_connect_errno() )
-		{
-			throw new \Exception( mysqli_connect_error() . "\nError Code: {$errorCode}" );
-		}
-		
-		if ( ! $mysqli->set_charset( 'utf8' ) )
-		{
-			throw new \Exception( "Error setting character set = utf-8 for database: {$this->_database}.\n{$mysqli->error}" );
-		}
-		
-		$this->db = $mysqli;
-	}
-	
-	/**
-	 * @param string $SQLDate
-	 * @param string $timezone
-	 *
-	 * @return string|null
-	 */
-	public static function SQLDateToPath( $SQLDate, $timezone = "America/Phoenix" )
+	public static function SQLDateToPath( $SQLDate )
 	{
 		if ( empty( $SQLDate ) ) return NULL;
 		
-		date_default_timezone_set( $timezone );
 		$timeStamp = strtotime( $SQLDate );
 		
 		return implode( DIRECTORY_SEPARATOR, [
@@ -154,108 +93,40 @@ class MySQL {
 	/**
 	 * Get the current time formatted for MySQL
 	 *
-	 * @param string $timezone
-	 *
 	 * @return false|string
 	 */
-	public static function now( $timezone = "America/Phoenix" )
+	public static function now()
 	{
-		return self::getSQLDate( $timezone );
-	}
-	
-	/**
-	 * Get the current time formatted for MySQL
-	 *
-	 * @param string $timezone
-	 *
-	 * @return false|string
-	 */
-	public static function getSQLDate( $timezone = "America/Phoenix" )
-	{
-		date_default_timezone_set( $timezone );
-		
 		return date( self::TIME_FORMAT );
 	}
 	
 	/**
-	 * Generate a variable-length random string of alpha characters. Defaults to lower case.
+	 * MySQL constructor.
 	 *
-	 * Set $caseSensitive = TRUE to return both upper & lower case alpha characters.
-	 *
-	 * @param      $length
-	 * @param bool $caseSensitive
-	 *
-	 * @return string
+	 * @param array $connectionParams
+	 * @param array $options
 	 */
-	public static function randomString( $length, $caseSensitive = FALSE )
+	public function __construct( array $connectionParams = [], array $options = [] )
 	{
-		if ( $caseSensitive )
-		{
-			$characters = self::$lc_alpha . strtoupper( self::$lc_alpha );
-		}
-		else
-		{
-			$characters = self::$lc_alpha;
-		}
+		$this->con = array_merge( $this->conDefaults, $connectionParams );
+		$this->opt = $options + $this->optDefaults;
 		
-		return self::_randomString( $characters, $length );
+		$dsn = sprintf(
+			self::DSN_FORMAT,
+			$this->con['DB_HOST'], $this->con['DB_NAME'], $this->con['DB_PORT'], $this->con['DB_CHARSET']
+		);
+		
+		$this->pdo = new PDO( $dsn, $this->con['DB_USERNAME'], $this->con['DB_PASSWORD'], $this->opt );
 	}
 	
 	/**
-	 * @param $characterSet
-	 * @param $length
-	 *
-	 * @return string
+	 * @return $this
 	 */
-	private static function _randomString( $characterSet, $length )
+	public function close()
 	{
-		$charLastIndex = (strlen( $characterSet ) - 1);
-		$string        = '';
+		$this->__destruct();
 		
-		for ( $i = 0; $i < $length; $i++ )
-		{
-			$string .= $characterSet[ mt_rand( 0, $charLastIndex ) ];
-		}
-		
-		return $string;
-	}
-	
-	/**
-	 * Generate a variable-length random string of alpha-numeric characters. Defaults to lower case.
-	 *
-	 * Set $caseSensitive = TRUE to return both upper & lower case alpha-numeric characters.
-	 *
-	 * @param      $length
-	 * @param bool $caseSensitive
-	 *
-	 * @return string
-	 */
-	public static function randomAlphaNumeric( $length, $caseSensitive = FALSE )
-	{
-		if ( $caseSensitive )
-		{
-			$characters = self::$numeric . self::$lc_alpha . strtoupper( self::$lc_alpha );
-		}
-		else
-		{
-			$characters = self::$numeric . self::$lc_alpha;
-		}
-		
-		return self::_randomString( $characters, $length );
-	}
-	
-	/**
-	 * Generate a variable-length random string of hexidecimal characters. Defaults to lower case.
-	 *
-	 * @param      $length
-	 *
-	 * @return string
-	 */
-	public static function randomHex( $length )
-	{
-		$characters = self::$hex;
-		
-		return self::_randomString( $characters, $length );
+		return $this;
 	}
 	
 	/**
@@ -271,599 +142,67 @@ class MySQL {
 	 */
 	public function switchDatabase( $database )
 	{
-		$this->db->close();
+		$this->pdo = NULL;
 		
-		$db = self::connect( NULL, [
-			'host'     => $this->_host,
-			'database' => $database,
-			'username' => $this->_username,
-			'password' => $this->_password,
-		] );
-		
-		$this->db = $db;
-		
-		return $this;
-	}
-	
-	/**
-	 * @param string $configFile
-	 * @param array  $options
-	 *
-	 * @return \mysqli
-	 * @throws \Exception
-	 */
-	public static function connect( $configFile = './database.json', array $options = [] )
-	{
-		
-		if ( empty( $configFile ) )
-		{
-			$host     = $options['host'];
-			$database = $options['database'];
-			$username = $options['username'];
-			$password = $options['password'];
-		}
-		elseif ( ! empty( $configFile ) && empty( $options ) )
-		{
-			$config   = json_decode( file_get_contents( $configFile ) );
-			$host     = $config->host;
-			$database = $config->database;
-			$username = $config->username;
-			$password = $config->password;
-		}
-		elseif ( ! empty( $configFile ) && ! empty( $options ) )
-		{
-			$config   = json_decode( file_get_contents( $configFile ) );
-			$host     = ! empty( $options['host'] ) ? $options['host'] : $config->host;
-			$database = ! empty( $options['database'] ) ? $options['database'] : $config->database;
-			$username = ! empty( $options['username'] ) ? $options['username'] : $config->username;
-			$password = ! empty( $options['password'] ) ? $options['password'] : $config->password;
-		}
-		
-		$mysqli = new \mysqli( $host, $username, $password, $database );
-		
-		if ( $errorCode = mysqli_connect_errno() )
-		{
-			throw new \Exception( mysqli_connect_error() . "\nError Code: {$errorCode}" );
-		}
-		
-		if ( ! $mysqli->set_charset( 'utf8' ) )
-		{
-			throw new \Exception( "Error setting character set = utf-8 for database: $database.\n{$mysqli->error}" );
-		}
-		
-		return $mysqli;
-	}
-	
-	/**
-	 * Automatically closes the connection to mysql
-	 */
-	function __destruct()
-	{
-		if ( ! is_null( $this->db ) )
-		{
-			$this->db->close();
-		}
-	}
-	
-	/**
-	 * Select a record set by passing in a table,
-	 * an array of fields to select,
-	 * and [optional] a where clause.
-	 * Returns MySQL instance for chaining
-	 *
-	 * Where clauses can be:
-	 * - a string (the raw statement: "WHERE `field`=value"; You must escape values)
-	 * - an array: [ 'key' => value ] @see http://medoo.in/api/where since their api is similar
-	 * - an integer: this will yield a "WHERE `id`=$intValue" where clause for convenience
-	 *
-	 * @param        $table
-	 * @param array  $columns
-	 * @param string $where
-	 *
-	 * @return $this
-	 */
-	public function select( $table, $columns = [ '*' ], $where = '' )
-	{
-		if ( func_num_args() === 2 && is_integer( func_get_arg( 1 ) ) )
-		{
-			$where   = func_get_arg( 1 );
-			$columns = [ '*' ];
-		}
-		
-		$columns = implode( ',', $this->escapeColumnNames( $columns ) );
-		
-		if ( is_integer( $where ) )
-		{
-			$WHERE = "WHERE `id`={$where} LIMIT 1";
-		}
-		elseif ( is_array( $where ) )
-		{
-			$WHERE = $this->getWhereClause( $where );
-		}
-		else
-		{
-			$WHERE = $where;
-		}
-		
-		$this->query( "SELECT {$columns} FROM `{$table}` $WHERE" );
-		
-		return $this;
-	}
-	
-	/**
-	 * Wraps an array of columns in backticks
-	 * and returns the escaped array
-	 *
-	 * @param array $colList
-	 *
-	 * @return array
-	 */
-	public function escapeColumnNames( array $colList )
-	{
-		$escapedList = [];
-		foreach ( $colList as $col )
-		{
-			$escapedList[] = $this->escapeColumnName( $col );
-		}
-		
-		return $escapedList;
-	}
-	
-	/**
-	 * Wraps a column name in backticks
-	 *
-	 * @param $columnName
-	 *
-	 * @return string
-	 */
-	public function escapeColumnName( $columnName )
-	{
-		if ( $columnName === '*' )
-		{
-			return $columnName;
-		}
-		
-		return '`' . $this->escape( $columnName ) . '`';
-	}
-	
-	/**
-	 * Escapes a value
-	 *
-	 * @param $string
-	 *
-	 * @return string
-	 */
-	public function escape( $string )
-	{
-		settype( $string, 'string' );
-		
-		return $this->db->real_escape_string( $string );
-	}
-	
-	/**
-	 * @param $whereData
-	 *
-	 * @return Where
-	 */
-	protected function getWhereClause( $whereData )
-	{
-		$where = new Where( $this->db );
-		$where->parseClause( $whereData );
-		
-		return $where;
-	}
-	
-	/**
-	 * Perform a raw SQL query. Does not return the result object,
-	 * but instead returns the MySQL instance for chaining.
-	 *
-	 * @see MySQL::getResult() for getting the raw result object.
-	 *
-	 * @param string $query
-	 *
-	 * @return MySQL $this
-	 * @throws BadQuery
-	 */
-	public function query( $query )
-	{
-		$this->setQuery( $query );
-		
-		$time = new Timer();
-		
-		if ( ! $this->queryResult = $this->db->query( $this->_query ) )
-		{
-			throw new BadQuery( $this->_query, $this->db->error, $this->getLogs() );
-		}
-		
-		$this->_logs[] = [ 'query' => array_pop( $this->_logs ), 'time' => $time->stop(), ];
-		
-		return $this;
-	}
-	
-	/**
-	 * @param string $query
-	 */
-	protected function setQuery( $query )
-	{
-		$this->_query  = $query;
-		$this->_logs[] = $query;
-	}
-	
-	/**
-	 * Gets an array of all the queries performed by the instance
-	 *
-	 * @return array
-	 */
-	public function getLogs()
-	{
-		return $this->_logs;
-	}
-	
-	/**
-	 * Insert a single row by passing the table,
-	 * an associative array of fields => values to insert,
-	 * and [optional] a boolean whether or not to update on duplicate with the same data set
-	 * Returns the insert id or false
-	 *
-	 * @param string $table
-	 * @param array  $insertPairs
-	 * @param bool   $update
-	 *
-	 * @return bool|integer
-	 */
-	public function insert( $table, array $insertPairs, $update = FALSE )
-	{
-		if ( empty( $insertPairs ) )
-		{
-			return FALSE;
-		}
-		
-		$escapedInserts = $this->buildInserts( $insertPairs );
-		
-		if ( $update )
-		{
-			$updateStatement = $this->buildUpdate( $insertPairs );
-			$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE {$updateStatement};" );
-		}
-		else
-		{
-			$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']});" );
-		}
-		
-		if ( $this->getResult() === TRUE )
-		{
-			$this->pushId( $this->insertId() );
-			
-			return $this->insertId();
-		}
-		else
-		{
-			return FALSE;
-		}
-	}
-	
-	/**
-	 * Escapes an associative array of [ keys => values ]
-	 * and returns an array with the escaped data
-	 * at $returnArray['keys'] & $returnArray['values']
-	 *
-	 * @param array $insertList
-	 *
-	 * @return array
-	 */
-	public function buildInserts( array $insertList )
-	{
-		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $insertList );
-		
-		return [
-			'keys'   => implode( ',', $escapedKeyValuePairs['keys'] ),
-			'values' => implode( ',', $escapedKeyValuePairs['values'] ),
-		];
-	}
-	
-	/**
-	 * @param array $assoc_array
-	 *
-	 * @return array
-	 */
-	public function escapeKeyValuePairs( array $assoc_array )
-	{
-		$keys   = [];
-		$values = [];
-		
-		foreach ( $assoc_array as $key => $val )
-		{
-			switch ( gettype( $val ) )
-			{
-				case 'object': # handle objects
-				case 'array': # and arrays the same
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = ("`$safeKey`");
-					
-					$jsonStrValue = json_encode( $val );
-					$safeValue    = $this->escape( $jsonStrValue );
-					$values[]     = "'$safeValue'";
-					break;
-				case 'string': # escape key & value and wrap in quotes
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = ("`$safeKey`");
-					
-					$safeValue = $this->escape( $val );
-					$values[]  = "'$safeValue'";
-					break;
-				case 'boolean': # booleans
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = "`$safeKey`";
-					
-					$values[] = $val ? 1 : 0;
-					break;
-				case 'NULL': # NULL
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = "`$safeKey`";
-					
-					$values[] = 'NULL';
-					break;
-				case 'double': # doubles
-				case 'integer': # & integers don't need escaping or quotations
-					$safeKey = $this->escape( trim( $key ) );
-					$keys[]  = "`$safeKey`";
-					
-					$values[] = $val;
-					break;
-				default: # if the value doesn't match these types,
-					break; # skip inclusion
-			}
-		}
-		
-		return [
-			'keys'   => $keys,
-			'values' => $values,
-		];
-	}
-	
-	/**
-	 * Escapes an associative array of [ keys => values ]
-	 * and returns an Update Statement string with the escaped data
-	 *
-	 * @param array $data
-	 *
-	 * @return string
-	 */
-	public function buildUpdate( array $data )
-	{
-		$updateList           = [];
-		$escapedKeyValuePairs = $this->escapeKeyValuePairs( $data );
-		$length               = count( $escapedKeyValuePairs['keys'] );
-		
-		for ( $i = 0; $i < $length; $i++ )
-		{
-			$updateList[] = "{$escapedKeyValuePairs['keys'][$i]}={$escapedKeyValuePairs['values'][$i]}";
-		}
-		
-		return implode( ', ', $updateList );
-	}
-	
-	/**
-	 * Returns the last query's result object
-	 *
-	 * @return null|\mysqli_result
-	 */
-	public function getResult()
-	{
-		if ( isset( $this->queryResult ) )
-		{
-			return $this->queryResult;
-		}
-		
-		return NULL;
-	}
-	
-	/**
-	 * @param $id
-	 *
-	 * @return int
-	 */
-	private function pushId( $id )
-	{
-		if ( $id > 0 )
-		{
-			$this->_ids[] = $id;
-		}
-		
-		return count( $this->_ids );
-	}
-	
-	/**
-	 * Returns the last inserted id from mysqli
-	 *
-	 * @return null|integer
-	 */
-	public function insertId()
-	{
-		$id = $this->db->insert_id;
-		
-		if ( $id > 0 )
-		{
-			return $id;
-		}
-		
-		return NULL;
-	}
-	
-	/**
-	 * Insert a single row by passing the table,
-	 * an associative array of fields => values to insert,
-	 * and an associative array of fields => values to update on duplicate
-	 * Returns the insert id or false
-	 *
-	 * @param string $table
-	 * @param array  $insertPairs
-	 * @param array  $updatePairs
-	 *
-	 * @throws \InvalidArgumentException
-	 *
-	 * @return bool|integer
-	 */
-	public function insertOnUpdate( $table, array $insertPairs, array $updatePairs )
-	{
-		if ( empty( $insertPairs ) || empty( $updatePairs ) )
-		{
-			throw new \InvalidArgumentException( "Insert data cannot be empty." );
-		}
-		
-		$escapedInserts  = $this->buildInserts( $insertPairs );
-		$updateStatement = $this->buildUpdate( $updatePairs );
-		
-		$this->query( "INSERT INTO `{$table}` ({$escapedInserts['keys']}) VALUES ({$escapedInserts['values']}) ON DUPLICATE KEY UPDATE {$updateStatement};" );
-		
-		if ( $this->getResult() === TRUE )
-		{
-			$this->pushId( $this->insertId() );
-			
-			return $this->insertId();
-		}
-		else
-		{
-			return FALSE;
-		}
-	}
-	
-	/**
-	 * Insert an array of models (associative arrays) into the given table in one query.
-	 * Returns true on success.
-	 *
-	 * @param       $table
-	 * @param array $dataSet
-	 *
-	 * @return \mysqli_result|null
-	 */
-	public function bulkInsert( $table, array $dataSet )
-	{
-		if ( ! $this->isNumericArray( $dataSet ) )
-		{
-			throw new \InvalidArgumentException( 'Array must be a numerically indexed array of associative arrays.' );
-		}
-		
-		$escapedFields = $this->buildInserts( $dataSet[0] )['keys'];
-		
-		$escapedDataList = implode( ',',
-			array_map(
-				function ( $data )
-				{
-					return '(' . $this->buildInserts( $data )['values'] . ')';
-				}
-				, $dataSet
-			)
+		$dsn = sprintf(
+			self::DSN_FORMAT,
+			$this->con['DB_HOST'], $database, $this->con['DB_PORT'], $this->con['DB_CHARSET']
 		);
 		
-		$this->query( "INSERT INTO `{$table}` ({$escapedFields}) VALUES {$escapedDataList};" );
+		$this->pdo = new PDO( $dsn, $this->con['DB_USERNAME'], $this->con['DB_PASSWORD'], $this->opt );
 		
-		return $this->getResult();
+		return $this;
 	}
 	
 	/**
-	 * @param array $array
+	 * @param array $fields
+	 * @param array $allowedFields
 	 *
-	 * @return bool
+	 * @return QueryBuilder
 	 */
-	public function isNumericArray( array $array )
+	public function select( array $fields = [], array $allowedFields = [] )
 	{
-		return array_keys( $array ) === range( 0, count( $array ) - 1 );
+		return QueryBuilder::select( $this, $fields, $allowedFields );
 	}
 	
 	/**
-	 * Update records by passing the table,
-	 * an associative array of fields => values to update,
-	 * and [optional] a where clause
-	 * Returns the number of rows affected by the query
+	 * @param array $data
+	 * @param array $allowedFields
 	 *
-	 * Where clauses can be:
-	 * - a string (the raw statement: "WHERE `field`=value"; You must escape values)
-	 * - an array: [ 'key' => value ] @see http://medoo.in/api/where since their api is similar
-	 * - an integer: this will yield a "WHERE `id`=$intValue" where clause for convenience
-	 *
-	 * @param        $table
-	 * @param        $data
-	 * @param string $where
-	 *
-	 * @return int
+	 * @return QueryBuilder
 	 */
-	public function update( $table, $data, $where = '' )
+	public function insert( array $data = [], array $allowedFields = [] )
 	{
-		$escapedData = $this->buildUpdate( $data );
-		
-		if ( is_integer( $where ) )
-		{
-			$WHERE = "WHERE `id`={$where} LIMIT 1";
-		}
-		elseif ( is_array( $where ) )
-		{
-			$WHERE = $this->getWhereClause( $where );
-		}
-		else
-		{
-			$WHERE = $where;
-		}
-		
-		$this->query( "UPDATE `{$table}` SET {$escapedData} {$WHERE}" );
-		
-		return $this->affectedRows();
+		return QueryBuilder::insert( $this, $data, $allowedFields );
 	}
 	
 	/**
-	 * Returns the number of rows affected by the last query
-	 * (inserts, updates, deletes)
+	 * @param array $data
+	 * @param array $allowedFields
 	 *
-	 * @return null|integer
+	 * @return QueryBuilder
 	 */
-	public function affectedRows()
+	public function update( array $data = [], array $allowedFields = [] )
 	{
-		return $this->db->affected_rows;
+		return QueryBuilder::update( $this, $data, $allowedFields );
 	}
 	
 	/**
-	 * Delete records by passing the table
-	 * and [optional] a where clause
-	 * Returns the number of rows affected by the query
+	 * @param array $allowedFields
 	 *
-	 * Where clauses can be:
-	 * - a string (the raw statement: "WHERE `field`=value"; You must escape values)
-	 * - an array: [ 'key' => value ] @see http://medoo.in/api/where since their api is similar
-	 * - an integer: this will yield a "WHERE `id`=$intValue" where clause for convenience
-	 *
-	 * @param        $table
-	 * @param string $where
-	 *
-	 * @return int|null
+	 * @return QueryBuilder
 	 */
-	public function delete( $table, $where = '' )
+	public function delete( array $allowedFields = [] )
 	{
-		if ( is_integer( $where ) )
-		{
-			$WHERE = "WHERE `id`={$where} LIMIT 1";
-		}
-		elseif ( is_array( $where ) )
-		{
-			$WHERE = $this->getWhereClause( $where );
-		}
-		else
-		{
-			$WHERE = $where;
-		}
-		
-		$this->query( "DELETE FROM `{$table}` {$WHERE}" );
-		
-		return $this->affectedRows();
+		return QueryBuilder::delete( $this, $allowedFields );
 	}
 	
 	/**
-	 * Create a table
-	 *
 	 * @param          $tableName
 	 * @param \Closure $schemaFunction
 	 * @param bool     $tableShouldBeUnique
 	 *
-	 * @return \mysqli_result|null
+	 * @return \PDOStatement
 	 */
 	public function createTable( $tableName, \Closure $schemaFunction, $tableShouldBeUnique = FALSE )
 	{
@@ -882,123 +221,438 @@ class MySQL {
 		
 		$this->createdTables[] = $tableBuilder->getTableName();
 		
-		return $this->getResult();
+		return $this->getStatement();
 	}
 	
 	/**
-	 * Applies a function against an accumulator ($carry) and each row of the last returned mysqli result object to
-	 * reduce it to a single value.
+	 * @param $table
 	 *
-	 * @param \Closure $cb
-	 * @param string   $carry
-	 *
-	 * @return mixed|string
+	 * @return QueryBuilder
 	 */
-	public function reduceResult( \Closure $cb, $carry = '' )
+	public function dropTable( $table )
 	{
-		while ( $record = $this->queryResult->fetch_assoc() )
+		return QueryBuilder::drop( $this, $table );
+	}
+	
+	/**
+	 * Drop all tables created by this instance.
+	 *
+	 * @throws BadQuery if drop table is unsuccessful
+	 */
+	public function dropAllCreatedTables()
+	{
+		array_map( function ( $table )
 		{
-			$carry = $cb( $carry, $record );
+			$this->dropTable( $table )->execute();
+		}, $this->getCreatedTables() );
+		
+		return $this;
+	}
+	
+	/**
+	 * Perform a raw SQL query. Does not return the result object,
+	 * but instead returns the MySQL instance for chaining.
+	 *
+	 * @see MySQL::getResult() for getting the raw result object.
+	 *
+	 * @param string $query
+	 *
+	 * @return MySQL $this
+	 */
+	public function query( $query )
+	{
+		if ( $query instanceof QueryBuilder )
+		{
+			$rawQuery = $query->renderQuery();
+			$params   = $query->getBoundParams();
+			
+			$this->setQuery( $rawQuery )
+			     ->addQueryToLog( $rawQuery, $params )
+			     ->startTimer();
+			
+			$this->prepare( $rawQuery );
+			$this->execute( $params );
+		}
+		else
+		{
+			$this->setQuery( $query )
+			     ->addQueryToLog( $query )
+			     ->startTimer();
+			
+			$this->stmt = $this->pdo->query( $this->query );
+		}
+		
+		$this->setTimeOnLastLog( $this->stopTimer() );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param $statement
+	 *
+	 * @return $this
+	 */
+	public function prepare( $statement )
+	{
+		$this->stmt = $this->pdo->prepare( $statement );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param array $inputParams
+	 *
+	 * @return $this
+	 */
+	public function execute( array $inputParams )
+	{
+		$this->stmt->execute( $inputParams );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param      $parameter
+	 * @param      $variable
+	 * @param int  $dataType
+	 * @param null $length
+	 * @param null $driverOptions
+	 *
+	 * @return $this
+	 */
+	public function bindParam( $parameter, $variable, $dataType = PDO::PARAM_STR, $length = NULL, $driverOptions = NULL )
+	{
+		$this->stmt->bindParam( $parameter, $variable, $dataType, $length, $driverOptions );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param      $column
+	 * @param      $param
+	 * @param null $type
+	 * @param null $maxLen
+	 * @param null $driverData
+	 *
+	 * @return $this
+	 */
+	public function bindColumn( $column, $param, $type = NULL, $maxLen = NULL, $driverData = NULL )
+	{
+		$this->stmt->bindColumn( $column, $param, $type, $maxLen, $driverData );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param     $parameter
+	 * @param     $value
+	 * @param int $dataType
+	 *
+	 * @return $this
+	 */
+	public function bindValue( $parameter, $value, $dataType = PDO::PARAM_STR )
+	{
+		$this->stmt->bindValue( $parameter, $value, $dataType );
+		
+		return $this;
+	}
+	
+	/**
+	 * @return $this
+	 */
+	public function beginTransaction()
+	{
+		$this->pdo->beginTransaction();
+		
+		return $this;
+	}
+	
+	/**
+	 * @return $this
+	 */
+	public function rollBack()
+	{
+		$this->pdo->rollBack();
+		
+		return $this;
+	}
+	
+	/**
+	 * @return $this
+	 */
+	public function commit()
+	{
+		$this->pdo->commit();
+		
+		return $this;
+	}
+	
+	/**
+	 * @return \PDOStatement
+	 */
+	public function getStatement()
+	{
+		return $this->stmt;
+	}
+	
+	/**
+	 * @return bool
+	 */
+	public function dump()
+	{
+		return $this->stmt->debugDumpParams();
+	}
+	
+	/**
+	 * @param null $input
+	 *
+	 * @return mixed|null
+	 */
+	protected function getFetchStyle( $input = NULL )
+	{
+		return ! is_null( $input ) ? $this->opt[ PDO::ATTR_DEFAULT_FETCH_MODE ] : $input;
+	}
+	
+	/**
+	 * @param int $fetchStyle
+	 *
+	 * @return array
+	 */
+	public function fetchAll( $fetchStyle = NULL )
+	{
+		return $this->stmt->fetchAll( $this->getFetchStyle( $fetchStyle ) );
+	}
+	
+	/**
+	 * @param     $fn
+	 * @param int $fetchStyle
+	 *
+	 * @return $this
+	 */
+	public function each( $fn, $fetchStyle = NULL )
+	{
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
+		{
+			call_user_func( $fn, $row );
+		}
+		
+		return $this;
+	}
+	
+	/**
+	 * @param null $mapFn
+	 * @param int  $fetchStyle
+	 *
+	 * @return array
+	 */
+	public function map( $mapFn = NULL, $fetchStyle = NULL )
+	{
+		$mapped = [];
+		
+		if ( is_null( $mapFn ) ) $mapFn = [ $this, 'identity' ];
+		
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
+		{
+			$mapped[] = call_user_func( $mapFn, $row );
+		}
+		
+		return $mapped;
+	}
+	
+	/**
+	 * @param      $reduceFn
+	 * @param null $initial
+	 * @param int  $fetchStyle
+	 *
+	 * @return mixed|null
+	 */
+	public function reduce( $reduceFn, $initial = NULL, $fetchStyle = NULL )
+	{
+		$carry = $initial;
+		
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
+		{
+			$carry = call_user_func( $reduceFn, $carry, $row );
 		}
 		
 		return $carry;
 	}
 	
 	/**
-	 * Creates a new array with the results of calling the provided function on each row of the last returned mysqli
-	 * result object.
-	 *
-	 * @param \Closure $cb
-	 *
-	 * @return array
-	 * @throws \Exception
-	 */
-	public function mapResult( $cb = NULL )
-	{
-		if ( is_null( $cb ) ) $cb = function ( array $row ) { return $row; };
-		
-		if ( ! $cb instanceof \Closure )
-		{
-			throw new \Exception( "Callback function must be an instance of \\Closure." );
-		}
-		
-		$newArray = [];
-		
-		while ( $record = $this->queryResult->fetch_assoc() )
-		{
-			$newArray[] = $cb( $record );
-		}
-		
-		return $newArray;
-	}
-	
-	/**
-	 * Returns the number of rows from the last query
-	 * (must be done before iterating over the result)
-	 *
-	 * @return null|integer
-	 */
-	public function numRows()
-	{
-		if ( isset( $this->queryResult ) )
-		{
-			return $this->queryResult->num_rows;
-		}
-		
-		return NULL;
-	}
-	
-	/**
-	 * Returns the last inserted id
-	 * Alias of MySQL::insertId
-	 *
-	 * @see MySQL::insertId()
-	 *
-	 * @return int|null
-	 */
-	public function lastId()
-	{
-		return $this->insertId();
-	}
-	
-	/**
-	 * Returns the last inserted id
-	 * Alias of MySQL::insertId
-	 *
-	 * @see MySQL::insertId()
-	 *
-	 * @return int|null
-	 */
-	public function id()
-	{
-		return $this->insertId();
-	}
-	
-	/**
-	 * ALias for getInsertedIds
-	 *
-	 * @see MySQL::getInsertedIds()
+	 * @param     $filterFn
+	 * @param int $fetchStyle
 	 *
 	 * @return array
 	 */
-	public function getIds()
+	public function filter( $filterFn, $fetchStyle = NULL )
 	{
-		return $this->getInsertedIds();
+		$filtered = [];
+		
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
+		{
+			if ( call_user_func( $filterFn, $row ) ) $filtered[] = $row;
+		}
+		
+		return $filtered;
 	}
 	
 	/**
-	 * Inserts performed using the insert methods
-	 * save the inserted ids to an array.
+	 * @param     $rejectFn
+	 * @param int $fetchStyle
 	 *
 	 * @return array
 	 */
-	public function getInsertedIds()
+	public function reject( $rejectFn, $fetchStyle = NULL )
 	{
-		return $this->_ids;
+		$filtered = [];
+		
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
+		{
+			if ( ! call_user_func( $rejectFn, $row ) ) $filtered[] = $row;
+		}
+		
+		return $filtered;
+	}
+	
+	/**
+	 * @param array $params
+	 * @param array $allowedParams
+	 *
+	 * @return array
+	 */
+	public function getNamedParamsFromAssoc( array $params, array $allowedParams = [] )
+	{
+		$keys = array_keys( $params );
+		
+		$mapPlaceholders = function ( $key ) { return sprintf( ":%s", $key ); };
+		
+		if ( count( $allowedParams ) )
+		{
+			$keys = array_filter( $keys, function ( $key ) use ( $allowedParams )
+			{
+				return in_array( $key, $allowedParams );
+			} );
+		}
+		
+		return array_map( $mapPlaceholders, $keys );
+	}
+	
+	/**
+	 * @param array $params
+	 * @param array $allowedParams
+	 *
+	 * @return array
+	 */
+	public function getNamedParams( array $params, array $allowedParams = [] )
+	{
+		$keys = $params;
+		
+		$mapPlaceholders = function ( $key ) { return sprintf( ":%s", $key ); };
+		
+		if ( count( $allowedParams ) )
+		{
+			$keys = array_filter( $keys, function ( $key ) use ( $allowedParams )
+			{
+				return in_array( $key, $allowedParams );
+			} );
+		}
+		
+		return array_map( $mapPlaceholders, $keys );
+	}
+	
+	/**
+	 * @param $query
+	 *
+	 * @return $this
+	 */
+	protected function setQuery( $query )
+	{
+		$this->query = $query;
+		
+		return $this;
+	}
+	
+	/**
+	 * Gets an array of all the queries performed by the instance
+	 *
+	 * @return array
+	 */
+	public function getLogs()
+	{
+		return $this->logs;
+	}
+	
+	/**
+	 * @param      $log
+	 * @param null $boundParams
+	 *
+	 * @return $this
+	 */
+	protected function addQueryToLog( $log, $boundParams = NULL )
+	{
+		$log = [ 'query' => $log, ];
+		if ( ! is_null( $boundParams ) ) $log['params'] = $boundParams;
+		$this->logs[] = $log;
+		
+		return $this;
+	}
+	
+	/**
+	 * @param $time
+	 *
+	 * @return $this
+	 */
+	protected function setTimeOnLastLog( $time )
+	{
+		$lastIndex = count( $this->logs ) - 1;
+		
+		$this->logs[ $lastIndex ]['time'] = $time;
+		
+		return $this;
+	}
+	
+	/**
+	 * @return $this
+	 */
+	protected function startTimer()
+	{
+		$this->timer = new Timer;
+		
+		return $this;
+	}
+	
+	/**
+	 * @return string
+	 */
+	protected function stopTimer()
+	{
+		return $this->timer->stop();
+	}
+	
+	/**
+	 * Returns the last inserted id from mysqli
+	 *
+	 * @return int
+	 */
+	public function lastInsertId()
+	{
+		return (int) $this->pdo->lastInsertId();
+	}
+	
+	/**
+	 * Returns the number of rows affected by the last query
+	 * (inserts, updates, deletes)
+	 *
+	 * @return int
+	 */
+	public function rowCount()
+	{
+		return $this->stmt->rowCount();
 	}
 	
 	/**
 	 * Get an array of all the columns in a given table [, and a given database ]
+	 * Database defaults to the current connected database.
 	 *
 	 * @param string $table
 	 * @param string $database
@@ -1007,62 +661,13 @@ class MySQL {
 	 */
 	public function getColumns( $table, $database = '' )
 	{
-		if ( empty( $database ) )
-		{
-			$database = $this->_database;
-		}
+		if ( empty( $database ) ) $database = $this->con['DB_NAME'];
 		
-		$this->query(
-			"SELECT column_name FROM information_schema.columns WHERE table_name = '$table' AND table_schema = '$database'"
-		);
+		$selectColumns = "SELECT column_name FROM information_schema.columns WHERE table_name=? AND table_schema=?";
 		
-		$this->iterateResult(
-			function ( $row ) use ( $table )
-			{
-				foreach ( $row as $index => $columnName )
-				{
-					$this->columns[ $table ][] = $columnName;
-				}
-			}
-		);
-		
-		return $this->columns[ $table ];
-	}
-	
-	/**
-	 * Takes an iterator (closure) to process each row of returned data.
-	 *
-	 * @param callable $cb
-	 *
-	 * @return MySQL $this
-	 */
-	public function iterateResult( callable $cb )
-	{
-		$args = array_slice( func_get_args(), 1 );
-		
-		if ( is_callable( $cb ) )
-		{
-			while ( $record = $this->queryResult->fetch_assoc() )
-			{
-				$params = array_merge( [ $record ], $args );
-				
-				call_user_func_array( $cb, $params );
-			}
-		}
-		
-		return $this;
-	}
-	
-	/**
-	 * Checks if an array is associative by asserting against numeric indices
-	 *
-	 * @param array $array
-	 *
-	 * @return bool
-	 */
-	public function isAssoc( array $array )
-	{
-		return array_keys( $array ) !== range( 0, count( $array ) - 1 );
+		return $this->prepare( $selectColumns )
+		            ->execute( [ $table, $database ] )
+		            ->map( function ( array $row ) { return $row['column_name']; }, PDO::FETCH_ASSOC );
 	}
 	
 	/**
@@ -1076,37 +681,13 @@ class MySQL {
 	}
 	
 	/**
-	 * Drop all tables created by this instance.
+	 * Returns an array of any tables created by this instance
 	 *
-	 * @throws BadQuery if drop table is unsuccessful
+	 * @return array
 	 */
-	public function dropAllCreatedTables()
+	public function getCreatedTables()
 	{
-		array_map(
-			function ( $tableName )
-			{
-				if ( ! $this->dropTable( $tableName ) )
-				{
-					throw new BadQuery( $this->getLastQuery(), $this->getError(), $this->getLogs() );
-				}
-			}
-			, $this->getCreatedTables()
-		);
-	}
-	
-	/**
-	 * Drop a table
-	 *
-	 * @param $table
-	 *
-	 * @return \mysqli_result|null
-	 */
-	public function dropTable( $table )
-	{
-		$statement = "DROP TABLE {$table}";
-		$this->query( $statement );
-		
-		return $this->getResult();
+		return $this->createdTables;
 	}
 	
 	/**
@@ -1116,32 +697,35 @@ class MySQL {
 	 */
 	public function getLastQuery()
 	{
-		if ( isset( $this->_query ) )
+		if ( isset( $this->query ) )
 		{
-			return $this->_query;
+			if ( is_array( $this->query ) )
+			{
+				return $this->query['query'];
+			}
+			
+			return $this->query;
 		}
 		
 		return NULL;
 	}
 	
 	/**
-	 * Get the last error from mysqli
+	 * @param null $x
 	 *
-	 * @return string
+	 * @return null
 	 */
-	public function getError()
+	public function identity( $x = NULL )
 	{
-		return $this->db->error;
+		return $x;
 	}
 	
 	/**
-	 * Returns an array of any tables created by this instance
-	 *
-	 * @return array
+	 * Automatically closes the connection to mysql
 	 */
-	public function getCreatedTables()
+	public function __destruct()
 	{
-		return $this->createdTables;
+		$this->pdo = NULL;
 	}
 	
 }
