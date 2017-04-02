@@ -19,7 +19,7 @@ class QueryBuilder {
 	const CREATE = 'CREATE';
 	const DROP   = 'DROP';
 	
-	const METHODS = [ self::SELECT, self::INSERT, self::UPDATE, self::DELETE ];
+	const METHODS = [ self::SELECT, self::INSERT, self::UPDATE, self::DELETE, self::DROP, self::CREATE ];
 	
 	const IS_NULL  = 'IS NULL';
 	const NOT_NULL = 'NOT NULL';
@@ -255,6 +255,22 @@ class QueryBuilder {
 		return $builder;
 	}
 	
+	/**
+	 * @param MySQL  $mySQL
+	 * @param string $table
+	 *
+	 * @return QueryBuilder
+	 */
+	public static function drop( MySQL $mySQL, $table = '' )
+	{
+		$builder = new self( $mySQL );
+		
+		$builder->setMethod( self::DROP );
+		if ( ! empty( $table ) ) $builder->table( $table );
+		
+		return $builder;
+	}
+	
 	public function limit( $limit )
 	{
 	
@@ -290,6 +306,8 @@ class QueryBuilder {
 				return $this->renderUpdate();
 			case self::DELETE:
 				return $this->renderDelete();
+			case self::DROP:
+				return $this->renderDrop();
 			default:
 				throw new \InvalidArgumentException( 'Missing database method!' );
 		}
@@ -376,6 +394,20 @@ class QueryBuilder {
 			$baseStmt[] = "WHERE";
 			$baseStmt[] = $this->renderWhereClause();
 		}
+		
+		return implode( ' ', $baseStmt );
+	}
+	
+	/**
+	 * @return string
+	 */
+	public function renderDrop()
+	{
+		$baseStmt = [
+			$this->method,
+			'TABLE',
+			$this->table,
+		];
 		
 		return implode( ' ', $baseStmt );
 	}

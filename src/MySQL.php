@@ -119,6 +119,9 @@ class MySQL {
 		$this->pdo = new PDO( $dsn, $this->con['DB_USERNAME'], $this->con['DB_PASSWORD'], $this->opt );
 	}
 	
+	/**
+	 * @return $this
+	 */
 	public function close()
 	{
 		$this->__destruct();
@@ -152,11 +155,98 @@ class MySQL {
 	}
 	
 	/**
-	 * Automatically closes the connection to mysql
+	 * @param array $fields
+	 * @param array $allowedFields
+	 *
+	 * @return QueryBuilder
 	 */
-	public function __destruct()
+	public function select( array $fields = [], array $allowedFields = [] )
 	{
-		$this->pdo = NULL;
+		return QueryBuilder::select( $this, $fields, $allowedFields );
+	}
+	
+	/**
+	 * @param array $data
+	 * @param array $allowedFields
+	 *
+	 * @return QueryBuilder
+	 */
+	public function insert( array $data = [], array $allowedFields = [] )
+	{
+		return QueryBuilder::insert( $this, $data, $allowedFields );
+	}
+	
+	/**
+	 * @param array $data
+	 * @param array $allowedFields
+	 *
+	 * @return QueryBuilder
+	 */
+	public function update( array $data = [], array $allowedFields = [] )
+	{
+		return QueryBuilder::update( $this, $data, $allowedFields );
+	}
+	
+	/**
+	 * @param array $allowedFields
+	 *
+	 * @return QueryBuilder
+	 */
+	public function delete( array $allowedFields = [] )
+	{
+		return QueryBuilder::delete( $this, $allowedFields );
+	}
+	
+	/**
+	 * @param          $tableName
+	 * @param \Closure $schemaFunction
+	 * @param bool     $tableShouldBeUnique
+	 *
+	 * @return \PDOStatement
+	 */
+	public function createTable( $tableName, \Closure $schemaFunction, $tableShouldBeUnique = FALSE )
+	{
+		if ( $tableShouldBeUnique )
+		{
+			$tableName = uniqid( $tableName );
+		}
+		
+		$tableBuilder = new TableBuilder( $tableName );
+		
+		$schemaFunction( $tableBuilder );
+		
+		$createStatement = $tableBuilder->render();
+		
+		$this->query( $createStatement );
+		
+		$this->createdTables[] = $tableBuilder->getTableName();
+		
+		return $this->getStatement();
+	}
+	
+	/**
+	 * @param $table
+	 *
+	 * @return QueryBuilder
+	 */
+	public function dropTable( $table )
+	{
+		return QueryBuilder::drop( $this, $table );
+	}
+	
+	/**
+	 * Drop all tables created by this instance.
+	 *
+	 * @throws BadQuery if drop table is unsuccessful
+	 */
+	public function dropAllCreatedTables()
+	{
+		array_map( function ( $table )
+		{
+			$this->dropTable( $table )->execute();
+		}, $this->getCreatedTables() );
+		
+		return $this;
 	}
 	
 	/**
@@ -197,6 +287,11 @@ class MySQL {
 		return $this;
 	}
 	
+	/**
+	 * @param $statement
+	 *
+	 * @return $this
+	 */
 	public function prepare( $statement )
 	{
 		$this->stmt = $this->pdo->prepare( $statement );
@@ -204,6 +299,11 @@ class MySQL {
 		return $this;
 	}
 	
+	/**
+	 * @param array $inputParams
+	 *
+	 * @return $this
+	 */
 	public function execute( array $inputParams )
 	{
 		$this->stmt->execute( $inputParams );
@@ -211,6 +311,55 @@ class MySQL {
 		return $this;
 	}
 	
+	/**
+	 * @param      $parameter
+	 * @param      $variable
+	 * @param int  $dataType
+	 * @param null $length
+	 * @param null $driverOptions
+	 *
+	 * @return $this
+	 */
+	public function bindParam( $parameter, $variable, $dataType = PDO::PARAM_STR, $length = NULL, $driverOptions = NULL )
+	{
+		$this->stmt->bindParam( $parameter, $variable, $dataType, $length, $driverOptions );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param      $column
+	 * @param      $param
+	 * @param null $type
+	 * @param null $maxLen
+	 * @param null $driverData
+	 *
+	 * @return $this
+	 */
+	public function bindColumn( $column, $param, $type = NULL, $maxLen = NULL, $driverData = NULL )
+	{
+		$this->stmt->bindColumn( $column, $param, $type, $maxLen, $driverData );
+		
+		return $this;
+	}
+	
+	/**
+	 * @param     $parameter
+	 * @param     $value
+	 * @param int $dataType
+	 *
+	 * @return $this
+	 */
+	public function bindValue( $parameter, $value, $dataType = PDO::PARAM_STR )
+	{
+		$this->stmt->bindValue( $parameter, $value, $dataType );
+		
+		return $this;
+	}
+	
+	/**
+	 * @return $this
+	 */
 	public function beginTransaction()
 	{
 		$this->pdo->beginTransaction();
@@ -218,6 +367,9 @@ class MySQL {
 		return $this;
 	}
 	
+	/**
+	 * @return $this
+	 */
 	public function rollBack()
 	{
 		$this->pdo->rollBack();
@@ -225,6 +377,9 @@ class MySQL {
 		return $this;
 	}
 	
+	/**
+	 * @return $this
+	 */
 	public function commit()
 	{
 		$this->pdo->commit();
@@ -232,9 +387,30 @@ class MySQL {
 		return $this;
 	}
 	
+	/**
+	 * @return \PDOStatement
+	 */
 	public function getStatement()
 	{
 		return $this->stmt;
+	}
+	
+	/**
+	 * @return bool
+	 */
+	public function dump()
+	{
+		return $this->stmt->debugDumpParams();
+	}
+	
+	/**
+	 * @param null $input
+	 *
+	 * @return mixed|null
+	 */
+	protected function getFetchStyle( $input = NULL )
+	{
+		return ! is_null( $input ) ? $this->opt[ PDO::ATTR_DEFAULT_FETCH_MODE ] : $input;
 	}
 	
 	/**
@@ -242,9 +418,9 @@ class MySQL {
 	 *
 	 * @return array
 	 */
-	public function fetchAll( $fetchStyle = PDO::FETCH_ASSOC )
+	public function fetchAll( $fetchStyle = NULL )
 	{
-		return $this->stmt->fetchAll( $fetchStyle );
+		return $this->stmt->fetchAll( $this->getFetchStyle( $fetchStyle ) );
 	}
 	
 	/**
@@ -253,9 +429,9 @@ class MySQL {
 	 *
 	 * @return $this
 	 */
-	public function each( $fn, $fetchStyle = PDO::FETCH_ASSOC )
+	public function each( $fn, $fetchStyle = NULL )
 	{
-		while ( $row = $this->stmt->fetch( $fetchStyle ) )
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
 		{
 			call_user_func( $fn, $row );
 		}
@@ -269,13 +445,13 @@ class MySQL {
 	 *
 	 * @return array
 	 */
-	public function map( $mapFn = NULL, $fetchStyle = PDO::FETCH_ASSOC )
+	public function map( $mapFn = NULL, $fetchStyle = NULL )
 	{
 		$mapped = [];
 		
 		if ( is_null( $mapFn ) ) $mapFn = [ $this, 'identity' ];
 		
-		while ( $row = $this->stmt->fetch( $fetchStyle ) )
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
 		{
 			$mapped[] = call_user_func( $mapFn, $row );
 		}
@@ -290,11 +466,11 @@ class MySQL {
 	 *
 	 * @return mixed|null
 	 */
-	public function reduce( $reduceFn, $initial = NULL, $fetchStyle = PDO::FETCH_ASSOC )
+	public function reduce( $reduceFn, $initial = NULL, $fetchStyle = NULL )
 	{
 		$carry = $initial;
 		
-		while ( $row = $this->stmt->fetch( $fetchStyle ) )
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
 		{
 			$carry = call_user_func( $reduceFn, $carry, $row );
 		}
@@ -308,11 +484,11 @@ class MySQL {
 	 *
 	 * @return array
 	 */
-	public function filter( $filterFn, $fetchStyle = PDO::FETCH_ASSOC )
+	public function filter( $filterFn, $fetchStyle = NULL )
 	{
 		$filtered = [];
 		
-		while ( $row = $this->stmt->fetch( $fetchStyle ) )
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
 		{
 			if ( call_user_func( $filterFn, $row ) ) $filtered[] = $row;
 		}
@@ -326,11 +502,11 @@ class MySQL {
 	 *
 	 * @return array
 	 */
-	public function reject( $rejectFn, $fetchStyle = PDO::FETCH_ASSOC )
+	public function reject( $rejectFn, $fetchStyle = NULL )
 	{
 		$filtered = [];
 		
-		while ( $row = $this->stmt->fetch( $fetchStyle ) )
+		while ( $row = $this->stmt->fetch( $this->getFetchStyle( $fetchStyle ) ) )
 		{
 			if ( ! call_user_func( $rejectFn, $row ) ) $filtered[] = $row;
 		}
@@ -421,6 +597,11 @@ class MySQL {
 		return $this;
 	}
 	
+	/**
+	 * @param $time
+	 *
+	 * @return $this
+	 */
 	protected function setTimeOnLastLog( $time )
 	{
 		$lastIndex = count( $this->logs ) - 1;
@@ -449,49 +630,6 @@ class MySQL {
 	}
 	
 	/**
-	 * @param array $fields
-	 * @param array $allowedFields
-	 *
-	 * @return QueryBuilder
-	 */
-	public function select( array $fields = [], array $allowedFields = [] )
-	{
-		return QueryBuilder::select( $this, $fields, $allowedFields );
-	}
-	
-	/**
-	 * @param array $data
-	 * @param array $allowedFields
-	 *
-	 * @return QueryBuilder
-	 */
-	public function insert( array $data = [], array $allowedFields = [] )
-	{
-		return QueryBuilder::insert( $this, $data, $allowedFields );
-	}
-	
-	/**
-	 * @param array $data
-	 * @param array $allowedFields
-	 *
-	 * @return QueryBuilder
-	 */
-	public function update( array $data = [], array $allowedFields = [] )
-	{
-		return QueryBuilder::update( $this, $data, $allowedFields );
-	}
-	
-	/**
-	 * @param array $allowedFields
-	 *
-	 * @return QueryBuilder
-	 */
-	public function delete( array $allowedFields = [] )
-	{
-		return QueryBuilder::delete( $this, $allowedFields );
-	}
-	
-	/**
 	 * Returns the last inserted id from mysqli
 	 *
 	 * @return int
@@ -499,39 +637,6 @@ class MySQL {
 	public function lastInsertId()
 	{
 		return (int) $this->pdo->lastInsertId();
-	}
-	
-	/**
-	 * Insert an array of models (associative arrays) into the given table in one query.
-	 * Returns true on success.
-	 *
-	 * @param       $table
-	 * @param array $dataSet
-	 *
-	 * @return \mysqli_result|null
-	 */
-	public function bulkInsert( $table, array $dataSet )
-	{
-		if ( ! $this->isNumericArray( $dataSet ) )
-		{
-			throw new \InvalidArgumentException( 'Array must be a numerically indexed array of associative arrays.' );
-		}
-		
-		$escapedFields = $this->buildInserts( $dataSet[0] )['keys'];
-		
-		$escapedDataList = implode( ',',
-			array_map(
-				function ( $data )
-				{
-					return '(' . $this->buildInserts( $data )['values'] . ')';
-				}
-				, $dataSet
-			)
-		);
-		
-		$this->query( "INSERT INTO `{$table}` ({$escapedFields}) VALUES {$escapedDataList};" );
-		
-		return $this->getResult();
 	}
 	
 	/**
@@ -543,35 +648,6 @@ class MySQL {
 	public function rowCount()
 	{
 		return $this->stmt->rowCount();
-	}
-	
-	/**
-	 * Create a table
-	 *
-	 * @param          $tableName
-	 * @param \Closure $schemaFunction
-	 * @param bool     $tableShouldBeUnique
-	 *
-	 * @return \PDOStatement
-	 */
-	public function createTable( $tableName, \Closure $schemaFunction, $tableShouldBeUnique = FALSE )
-	{
-		if ( $tableShouldBeUnique )
-		{
-			$tableName = uniqid( $tableName );
-		}
-		
-		$tableBuilder = new TableBuilder( $tableName );
-		
-		$schemaFunction( $tableBuilder );
-		
-		$createStatement = $tableBuilder->render();
-		
-		$this->query( $createStatement );
-		
-		$this->createdTables[] = $tableBuilder->getTableName();
-		
-		return $this->getStatement();
 	}
 	
 	/**
@@ -605,37 +681,13 @@ class MySQL {
 	}
 	
 	/**
-	 * Drop all tables created by this instance.
+	 * Returns an array of any tables created by this instance
 	 *
-	 * @throws BadQuery if drop table is unsuccessful
+	 * @return array
 	 */
-	public function dropAllCreatedTables()
+	public function getCreatedTables()
 	{
-		array_map(
-			function ( $tableName )
-			{
-				if ( ! $this->dropTable( $tableName ) )
-				{
-					throw new BadQuery( $this->getLastQuery(), $this->getError(), $this->getLogs() );
-				}
-			}
-			, $this->getCreatedTables()
-		);
-	}
-	
-	/**
-	 * Drop a table
-	 *
-	 * @param $table
-	 *
-	 * @return \mysqli_result|null
-	 */
-	public function dropTable( $table )
-	{
-		$statement = "DROP TABLE {$table}";
-		$this->query( $statement );
-		
-		return $this->getResult();
+		return $this->createdTables;
 	}
 	
 	/**
@@ -647,6 +699,11 @@ class MySQL {
 	{
 		if ( isset( $this->query ) )
 		{
+			if ( is_array( $this->query ) )
+			{
+				return $this->query['query'];
+			}
+			
 			return $this->query;
 		}
 		
@@ -654,23 +711,21 @@ class MySQL {
 	}
 	
 	/**
-	 * Returns an array of any tables created by this instance
+	 * @param null $x
 	 *
-	 * @return array
+	 * @return null
 	 */
-	public function getCreatedTables()
-	{
-		return $this->createdTables;
-	}
-	
-	public function noop()
-	{
-	
-	}
-	
 	public function identity( $x = NULL )
 	{
 		return $x;
+	}
+	
+	/**
+	 * Automatically closes the connection to mysql
+	 */
+	public function __destruct()
+	{
+		$this->pdo = NULL;
 	}
 	
 }
