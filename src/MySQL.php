@@ -109,7 +109,7 @@ class MySQL {
 	public function __construct( array $connectionParams = [], array $options = [] )
 	{
 		$this->con = array_merge( $this->conDefaults, $connectionParams );
-		$this->opt = array_merge( $this->optDefaults, $options );
+		$this->opt = $options + $this->optDefaults;
 		
 		$dsn = sprintf(
 			self::DSN_FORMAT,

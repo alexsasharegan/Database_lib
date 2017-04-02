@@ -139,17 +139,15 @@ class QueryBuilder {
 	 *
 	 * @return static
 	 */
-	public function where( $key, $value, $operator = '=', $conjunction = NULL )
+	public function where( $key, $operator, $value = NULL, $conjunction = NULL )
 	{
 		if ( $this->isValidField( $key ) )
 		{
-			$args     = func_get_args();
 			$operator = strtoupper( $operator );
 			if ( count( $this->whereClauses ) && is_null( $conjunction ) ) $conjunction = self::WHERE_CONJUNCTIONS[0];
 			
-			if ( count( $args ) == 2 && in_array( $args[1], self::WHERE_OPS_SPECIAL ) )
+			if ( in_array( $operator, self::WHERE_OPS_SPECIAL ) )
 			{
-				$operator             = $value;
 				$this->whereClauses[] = [ [ $key => NULL ], $operator, $conjunction ];
 			}
 			else
@@ -166,27 +164,27 @@ class QueryBuilder {
 	}
 	
 	/**
-	 * @param        $key
-	 * @param        $value
-	 * @param string $operator
+	 * @param      $key
+	 * @param      $operator
+	 * @param null $value
 	 *
-	 * @return static
+	 * @return QueryBuilder
 	 */
-	public function andWhere( $key, $value, $operator = '=' )
+	public function andWhere( $key, $operator, $value = NULL )
 	{
-		return $this->where( $key, $value, $operator, self::WHERE_CONJUNCTIONS[0] );
+		return $this->where( $key, $operator, $value, self::WHERE_CONJUNCTIONS[0] );
 	}
 	
 	/**
-	 * @param        $key
-	 * @param        $value
-	 * @param string $operator
+	 * @param      $key
+	 * @param      $operator
+	 * @param null $value
 	 *
-	 * @return static
+	 * @return QueryBuilder
 	 */
-	public function orWhere( $key, $value, $operator = '=' )
+	public function orWhere( $key, $operator, $value = NULL )
 	{
-		return $this->where( $key, $value, $operator, self::WHERE_CONJUNCTIONS[1] );
+		return $this->where( $key, $operator, $value, self::WHERE_CONJUNCTIONS[1] );
 	}
 	
 	/**
