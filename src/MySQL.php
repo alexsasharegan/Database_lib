@@ -37,6 +37,7 @@ class MySQL {
 		PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
 		PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 		PDO::ATTR_EMULATE_PREPARES   => FALSE,
+		PDO::ATTR_STRINGIFY_FETCHES  => FALSE,
 	];
 	/**
 	 * @var array
@@ -206,6 +207,27 @@ class MySQL {
 	public function execute( array $inputParams )
 	{
 		$this->stmt->execute( $inputParams );
+		
+		return $this;
+	}
+	
+	public function beginTransaction()
+	{
+		$this->pdo->beginTransaction();
+		
+		return $this;
+	}
+	
+	public function rollBack()
+	{
+		$this->pdo->rollBack();
+		
+		return $this;
+	}
+	
+	public function commit()
+	{
+		$this->pdo->commit();
 		
 		return $this;
 	}
@@ -530,7 +552,7 @@ class MySQL {
 	 * @param \Closure $schemaFunction
 	 * @param bool     $tableShouldBeUnique
 	 *
-	 * @return \mysqli_result|null
+	 * @return \PDOStatement
 	 */
 	public function createTable( $tableName, \Closure $schemaFunction, $tableShouldBeUnique = FALSE )
 	{
@@ -549,7 +571,7 @@ class MySQL {
 		
 		$this->createdTables[] = $tableBuilder->getTableName();
 		
-		return $this->getResult();
+		return $this->getStatement();
 	}
 	
 	/**

@@ -16,6 +16,8 @@ class QueryBuilder {
 	const INSERT = 'INSERT';
 	const UPDATE = 'UPDATE';
 	const DELETE = 'DELETE';
+	const CREATE = 'CREATE';
+	const DROP   = 'DROP';
 	
 	const METHODS = [ self::SELECT, self::INSERT, self::UPDATE, self::DELETE ];
 	
@@ -72,6 +74,8 @@ class QueryBuilder {
 	 */
 	public function setMethod( $method )
 	{
+		$method = strtoupper( $method );
+		
 		if ( $this->isValidMethod( $method ) )
 		{
 			$this->method = $method;
@@ -115,6 +119,11 @@ class QueryBuilder {
 		return $this->table( $table );
 	}
 	
+	/**
+	 * @param $table
+	 *
+	 * @return $this
+	 */
 	public function table( $table )
 	{
 		$this->table = $this->escapeTable( $table );
@@ -246,6 +255,26 @@ class QueryBuilder {
 		return $builder;
 	}
 	
+	public function limit( $limit )
+	{
+	
+	}
+	
+	public function offset( $offset )
+	{
+	
+	}
+	
+	public function groupBy( $groupBy )
+	{
+	
+	}
+	
+	public function orderBy( $orderBy )
+	{
+	
+	}
+	
 	/**
 	 * @return string
 	 */
@@ -257,10 +286,10 @@ class QueryBuilder {
 				return $this->renderSelect();
 			case self::INSERT:
 				return $this->renderInsert();
-			// case self::UPDATE:
-			// 	return $this->renderUpdate();
-			// case self::DELETE:
-			// 	return $this->renderDelete();
+			case self::UPDATE:
+				return $this->renderUpdate();
+			case self::DELETE:
+				return $this->renderDelete();
 			default:
 				throw new \InvalidArgumentException( 'Missing database method!' );
 		}
@@ -310,6 +339,50 @@ class QueryBuilder {
 		return implode( ' ', $baseStmt );
 	}
 	
+	/**
+	 * @return string
+	 */
+	public function renderUpdate()
+	{
+		$baseStmt = [
+			$this->method,
+			$this->table,
+			'SET',
+			$this->renderUpdatePairs( $this->dmlFields ),
+		];
+		
+		if ( count( $this->whereClauses ) )
+		{
+			$baseStmt[] = "WHERE";
+			$baseStmt[] = $this->renderWhereClause();
+		}
+		
+		return implode( ' ', $baseStmt );
+	}
+	
+	/**
+	 * @return string
+	 */
+	public function renderDelete()
+	{
+		$baseStmt = [
+			$this->method,
+			'FROM',
+			$this->table,
+		];
+		
+		if ( count( $this->whereClauses ) )
+		{
+			$baseStmt[] = "WHERE";
+			$baseStmt[] = $this->renderWhereClause();
+		}
+		
+		return implode( ' ', $baseStmt );
+	}
+	
+	/**
+	 * @return string
+	 */
 	protected function renderWhereClause()
 	{
 		$clause = [];
@@ -358,6 +431,24 @@ class QueryBuilder {
 		}
 		
 		return implode( ' ', $clause );
+	}
+	
+	/**
+	 * @param array $dmlFields
+	 *
+	 * @return string
+	 */
+	protected function renderUpdatePairs( array $dmlFields )
+	{
+		$updatePairs = array_combine( $dmlFields, $this->mySQL->getNamedParams( $dmlFields ) );
+		$updateStmt  = [];
+		
+		foreach ( $updatePairs as $key => $placeholder )
+		{
+			$updateStmt[] = sprintf( '%s = %s', $key, $placeholder );
+		}
+		
+		return implode( ', ', $updateStmt );
 	}
 	
 	/**
@@ -471,6 +562,11 @@ class QueryBuilder {
 		return $this->mySQL->query( $this );
 	}
 	
+	/**
+	 * @param array $data
+	 *
+	 * @return $this
+	 */
 	public function setData( array $data )
 	{
 		$allowedData     = $this->filterAllowedData( $data );
@@ -481,6 +577,9 @@ class QueryBuilder {
 		return $this;
 	}
 	
+	/**
+	 * @return string
+	 */
 	public function __toString()
 	{
 		return $this->renderQuery();
